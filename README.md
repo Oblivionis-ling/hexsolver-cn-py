@@ -123,13 +123,7 @@ $env:GITHUB_TOKEN="ghp_xxx"
 同步到GitHub.cmd -Message "Update project"
 ```
 
-如果还没有配置 GitHub 远端，脚本会提示先添加 `origin`。
-
-如果 `git push` 被网络连接挡住，可以走 GitHub API 备用同步：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync_github_api.ps1
-```
+如果 `git push` 被网络连接挡住，脚本会自动改用 GitHub API 备用同步。
 
 升级版本号可以运行：
 

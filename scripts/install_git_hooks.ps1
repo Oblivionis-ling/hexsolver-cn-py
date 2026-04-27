@@ -22,7 +22,11 @@ fi
 
 git push origin main
 if [ $? -ne 0 ]; then
-  echo "post-commit: auto push failed. Run scripts/sync_github.ps1 after fixing network or auth."
+  echo "post-commit: git push failed; trying GitHub API sync fallback."
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync_github_api.ps1
+  if [ $? -ne 0 ]; then
+    echo "post-commit: API sync fallback failed. Run scripts/sync_github.ps1 after fixing network or auth."
+  fi
 fi
 exit 0
 '@

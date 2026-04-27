@@ -32,3 +32,7 @@ if (-not $remote) {
 }
 
 git push -u origin main
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "git push failed; trying GitHub API sync fallback."
+    powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "sync_github_api.ps1") -Message "Sync main from local fallback"
+}
