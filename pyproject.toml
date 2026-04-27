@@ -1,0 +1,23 @@
+[project]
+name = "hexsolver-cn-py"
+version = "0.1.0"
+description = "Chinese Hexcells Infinite screenshot OCR and solver workbench."
+requires-python = ">=3.11"
+dependencies = [
+    "customtkinter",
+    "numpy",
+    "onnxruntime",
+    "opencv-python-headless",
+    "ortools",
+    "pillow",
+    "rapidocr",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+hexsolver_cn = ["assets/ocr_patterns/*.png"]

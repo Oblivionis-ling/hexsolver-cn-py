@@ -1,0 +1,7 @@
+customtkinter
+numpy
+onnxruntime
+pillow
+opencv-python-headless
+ortools
+rapidocr
