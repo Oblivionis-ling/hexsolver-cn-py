@@ -1,6 +1,6 @@
 # 求解算法说明
 
-这份文档总结当前项目的求解计算逻辑，重点对应 [solver.py](D:\Desktop\HexInfinite\hexsolver_cn_py\src\hexsolver_cn\solver.py) 中已经实现的约束建模与推理流程。
+这份文档总结当前项目的求解计算逻辑，重点对应 [solver.py](src/hexsolver_cn/solver.py) 中已经实现的约束建模与推理流程。
 
 ## 1. 输入与目标
 

@@ -19,3 +19,7 @@ venv/
 env/
 *.png.overlay.png
 exports/
+scripts/
+*.cmd
+test/
+ocr_debug/

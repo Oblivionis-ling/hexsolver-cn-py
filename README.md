@@ -1,132 +1,79 @@
-# Hexcells 中文求解助手（Python 版）
+# Hexsolver CN
 
 当前版本：`0.1.0`
 
-这是一个仿照 `HexSolver` 技术路线重写的 Python 原型，核心目标是：
+这是一个面向 `Hexcells Infinite` 的中文截图求解工作台。项目先导入截图，再识别棋盘、OCR 读取线索、允许人工校对，最后给出当前可以安全操作的格子和中文理由。
 
-- 不直接抓游戏窗口，而是先导入一张截图
-- 自动识别六边形棋盘位置
-- 自动识别棋盘中的蓝格/黑格提示
-- 自动填充外侧行线索 OCR 和顶部 `REMAINING`
-- 提供中文界面和更适合补录线索的工作台
-- 在求解时给出“哪些格子当前可以安全判蓝/判黑”以及对应理由
-- 直接在截图上叠加“可开（蓝）/应标黑”的解题建议
+## 主要能力
 
-其中：
-- `可开（蓝）` 表示这个格子当前可以安全点开
-- `应标黑` 表示这个格子当前必须标成黑格，不能点开
+- 导入 `Hexcells` / `Hexcells Infinite` 截图。
+- 自动识别六边形棋盘、未知格、蓝格、黑格和不可用格。
+- 自动尝试识别格内线索、外侧行线索和顶部 `REMAINING`。
+- 在 OCR 不确定时保留候选框，方便人工检查和补录。
+- 使用约束求解器给出“可开蓝格”和“应标黑格”。
+- 在原截图上叠加求解建议，便于对照游戏操作。
 
-## 当前版本已经完成的能力
+## 安装与运行
 
-- 使用工作区本地 `conda` 环境运行
-- 导入 `Hexcells` / `Hexcells Infinite` 截图
-- 自动识别橙色未知格，并推断整个六边形网格
-- 支持不同分辨率截图，已经适配工作区里的 `test/3-1.png` 和 `test/31.png`
-- 自动把格子分成：橙色未知、蓝色已知、黑色已知、浅灰不可用
-- 自动识别蓝格和黑格里的数字提示
-- 自动识别并预填一批高可信外侧行线索 OCR
-- 自动识别并预填顶部 `REMAINING`
-- 提供更大的中文界面、线索补录表和截图叠图
-- 提供“检查台”：
-  - 选中行线索 / 格内线索 / OCR 框后显示局部放大图
-  - 支持把选中的 OCR 框一键绑定到行线索
-  - 支持把选中的 OCR 框一键绑定到格内线索
-  - 支持把选中的 OCR 框直接设为 `REMAINING`
-- 支持导出当前画面上的叠图结果
-- 求解时输出：
-  - 必须判蓝的格子
-  - 必须判黑的格子
-  - 每一步对应的中文理由
-
-## 目前的现实限制
-
-- 外侧行线索 OCR 仍然不是百分之百准确，所以仍然建议人工检查
-- 当前策略会优先“少错”而不是“强行把每一条都填满”
-  - 也就是说，没有把握的行线索会宁可留空，交给你在检查台里快速补
-- 对截图的要求是：
-  - 游戏画面尽量完整
-  - 不要有缩放模糊
-  - 最好和原版风格接近
-- 这是一版“可运行的中文原型”，优先保证流程通、自动预填和理由正确，不追求一步到位的 OCR 完美率
-
-## 运行方式
-
-如果环境已经创建好，直接运行：
-
-```cmd
-启动程序.cmd
-```
-
-如果你想从头重建这个独立环境，可以直接运行：
-
-```cmd
-重建环境.cmd
-```
-
-或者手工运行：
-
-```cmd
-conda activate D:\Desktop\HexInfinite\hexsolver_cn_py\.conda_env
-python D:\Desktop\HexInfinite\hexsolver_cn_py\main.py
-```
-
-## 建议操作顺序
-
-1. 点击“导入截图”
-2. 点击“自动识别 + OCR”
-3. 先到“检查台”确认当前选中的对象和局部放大图
-4. 在“行线索”页先检查自动识别出的外侧行线索
-5. 如果 OCR 框和线索对得上，先分别选中它们，再用“将所选 OCR 用于行 / 格 / REMAINING”
-6. 如有需要，双击右侧已知蓝格/黑格，修正格内线索
-7. 检查 `REMAINING` 是否正确
-8. 点击“开始求解”，右侧截图会直接叠加结果
-
-## 主要文件
-
-- `main.py`
-- `VERSION`
-- `PROJECT_ROUTE.md`
-- `requirements.txt`
-- `pyproject.toml`
-- `重建环境.cmd`
-- `启动程序.cmd`
-- `创建GitHub仓库.cmd`
-- `同步到GitHub.cmd`
-- `安装自动同步Hook.cmd`
-- `升级版本.cmd`
-- `src/hexsolver_cn/app.py`
-- `src/hexsolver_cn/detector.py`
-- `src/hexsolver_cn/ocr.py`
-- `src/hexsolver_cn/solver.py`
-- `src/hexsolver_cn/models.py`
-
-## GitHub 同步
-
-项目建议使用 `main` 分支，并通过 `post-commit` hook 做提交后自动同步。
-
-如果本机没有 GitHub CLI，可以用 GitHub Token 创建私有仓库：
+建议使用 Python 3.11。
 
 ```powershell
-$env:GITHUB_TOKEN="ghp_xxx"
-.\创建GitHub仓库.cmd
+python -m pip install -r requirements.txt
+python main.py
 ```
 
-首次配置远端仓库后运行：
+如果使用 Conda，可以先创建独立环境：
 
-```cmd
-安装自动同步Hook.cmd
+```powershell
+conda create -y -n hexsolver-cn python=3.11
+conda activate hexsolver-cn
+python -m pip install -r requirements.txt
+python main.py
 ```
 
-手动提交并推送可以运行：
+## 使用流程
 
-```cmd
-同步到GitHub.cmd -Message "Update project"
+1. 点击“导入截图”。
+2. 点击“自动识别 + OCR”。
+3. 检查自动识别出的格内线索、行线索和 `REMAINING`。
+4. 对 OCR 没有把握的项目进行人工补录。
+5. 点击“开始求解”。
+6. 在右侧截图叠图中查看可开格子、应标黑格和对应理由。
+
+## 项目目录
+
+```text
+hexsolver_cn_py/
+  main.py                         程序入口
+  README.md                       项目说明
+  ROADMAP.md                      项目技术路线
+  OCR_PLAN.md                     OCR 优化计划
+  SOLVER_ALGORITHM.md             求解算法说明
+  VERSION                         当前版本号
+  pyproject.toml                  Python 项目配置
+  requirements.txt                运行依赖
+  src/
+    __init__.py
+    hexsolver_cn/
+      __init__.py                 包版本信息
+      app.py                      中文桌面界面、截图叠图、人工校对入口
+      detector.py                 截图分析、棋盘几何识别、线索候选匹配
+      models.py                   棋盘、格子、线索等数据模型
+      ocr.py                      模板 OCR、RapidOCR 封装和线索文本解析
+      solver.py                   Hexcells 规则约束建模与求解
+      assets/
+        ocr_patterns/             游戏字体数字和符号模板
 ```
 
-如果 `git push` 被网络连接挡住，脚本会自动改用 GitHub API 备用同步。
+## 仓库规则
 
-升级版本号可以运行：
+GitHub 仓库只保留项目源码、文档、配置和必要资源。
 
-```cmd
-升级版本.cmd -Version 0.1.1 -Commit
-```
+不会上传的内容包括：
+
+- 本地 Conda 环境和虚拟环境。
+- `__pycache__`、缓存、日志和构建产物。
+- 本机调试截图、导出叠图和临时 OCR 调试结果。
+- 本地使用的 `.cmd` 文件、同步脚本和仓库管理脚本。
+
+这样做的目标是让 GitHub 仓库保持简单、可读、可复现，本机自动化工具则只服务于当前开发电脑。
