@@ -13,6 +13,7 @@ __pycache__/
 htmlcov/
 build/
 dist/
+managed_core/bin/
 *.egg-info/
 .venv/
 venv/
@@ -21,5 +22,13 @@ env/
 exports/
 scripts/
 *.cmd
+!run.cmd
+!启动求解器.cmd
 test/
 ocr_debug/
+.vscode/
+tests/images/*
+tests/labels/*
+tests/reports/*
+tests/crops/*
+tests/ocr_cases/

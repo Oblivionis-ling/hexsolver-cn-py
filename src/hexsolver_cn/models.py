@@ -82,6 +82,16 @@ class Cell:
         return f"({q}, {r})"
 
 
+@dataclass(frozen=True)
+class CellReveal:
+    """Metadata exposed only after a covered cell is opened in the session."""
+
+    visual_type: CellVisualType
+    clue_text: str = ""
+    clue_type: ClueType = ClueType.NONE
+    clue_number: Optional[int] = None
+
+
 @dataclass
 class RowClue:
     line_id: str

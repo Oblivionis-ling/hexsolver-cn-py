@@ -43,11 +43,33 @@ class SolverError(RuntimeError):
 
 
 class HexReasoningSolver:
+    SOURCE_PRIORITY = {
+        "局部必然": 0,
+        "排列推理": 1,
+        "子集差分": 2,
+        "全局剩余": 3,
+        "全局求解": 4,
+    }
+
     def solve(self, board: Board) -> List[SuggestedMove]:
         local_moves = self._collect_local_moves(board)
         if local_moves:
-            return sorted(local_moves.values(), key=lambda move: (move.coord[1], move.coord[0], move.action.value))
-        return self._collect_global_forced_moves(board)
+            return sorted(local_moves.values(), key=self._move_sort_key)
+        return sorted(self._collect_global_forced_moves(board), key=self._move_sort_key)
+
+    def next_step(self, board: Board) -> Optional[SuggestedMove]:
+        """Return one deterministic, most explainable forced move."""
+
+        moves = self.solve(board)
+        return moves[0] if moves else None
+
+    def _move_sort_key(self, move: SuggestedMove) -> Tuple[int, int, int, str]:
+        return (
+            self.SOURCE_PRIORITY.get(move.source, 99),
+            move.coord[1],
+            move.coord[0],
+            move.action.value,
+        )
 
     def _collect_local_moves(self, board: Board) -> Dict[Coord, SuggestedMove]:
         moves: Dict[Coord, SuggestedMove] = {}
@@ -458,13 +480,10 @@ class HexReasoningSolver:
 
     def _neighbor_coords(self, board: Board, coord: Coord) -> List[Coord]:
         q, r = coord
-        coords: List[Coord] = []
-        for dq, dr in NEIGHBOR_DIRS:
-            target = (q + dq, r + dr)
-            cell = board.get_cell(target)
-            if cell is not None and cell.is_playable:
-                coords.append(target)
-        return coords
+        # Preserve all six positions.  A hole in the generated board counts as
+        # a non-blue separator for consecutive/non-consecutive clues; removing
+        # it would incorrectly join blue runs on either side of the gap.
+        return [(q + dq, r + dr) for dq, dr in NEIGHBOR_DIRS]
 
     def _area_coords(self, board: Board, coord: Coord) -> List[Coord]:
         q, r = coord
@@ -496,4 +515,3 @@ class HexReasoningSolver:
         if existing is not None and existing.action != action:
             return
         moves[coord] = SuggestedMove(coord=coord, action=action, reason=reason, source=source)
-

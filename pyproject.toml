@@ -1,15 +1,16 @@
 [project]
 name = "hexsolver-cn-py"
-version = "0.1.0"
-description = "Chinese Hexcells Infinite screenshot OCR and solver workbench."
+version = "0.4.1"
+description = "Game-styled Hexcells Infinite seed and step solver for Windows."
 requires-python = ">=3.11"
 dependencies = [
-    "customtkinter",
     "numpy",
     "onnxruntime",
     "opencv-python-headless",
     "ortools",
     "pillow",
+    "PySide6",
+    "qtawesome",
     "rapidocr",
 ]
 
