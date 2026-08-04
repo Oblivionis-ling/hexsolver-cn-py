@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import time
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -69,6 +70,18 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.assertGreater(self.window.step_reason.verticalScrollBar().maximum(), 0)
         self.assertEqual(0, self.window.step_reason.verticalScrollBar().value())
         self.assertTrue(self.window.apply_button.isEnabled())
+
+    def test_screenshot_import_is_disabled_in_ui_and_guarded_in_handler(self) -> None:
+        board_before = self.window.session.board
+
+        self.assertFalse(self.window.stage.import_button.isEnabled())
+        self.assertIn("暂时关闭", self.window.stage.import_button.toolTip())
+        with patch("hexsolver_cn.app.QFileDialog.getOpenFileName") as file_picker:
+            self.window.import_screenshot()
+
+        file_picker.assert_not_called()
+        self.assertIs(self.window.session.board, board_before)
+        self.assertIn("截图识别功能暂时关闭", self.window.stage.toast.text())
 
     def test_manual_mark_and_undo_round_trip(self) -> None:
         coord = next(

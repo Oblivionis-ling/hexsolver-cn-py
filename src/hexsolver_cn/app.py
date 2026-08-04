@@ -42,6 +42,9 @@ from .theme import COLORS, app_stylesheet
 from .widgets import ChamferPanel, HexCounterBadge, StateButton
 
 
+SCREENSHOT_IMPORT_ENABLED = False
+
+
 @dataclass(frozen=True)
 class HistoryEntry:
     action: str
@@ -103,7 +106,10 @@ class BoardStage(QWidget):
         tools.setContentsMargins(7, 5, 7, 5)
         tools.setSpacing(1)
 
-        self.import_button = self._tool_button("fa5s.image", "导入截图")
+        self.import_button = self._tool_button("fa5s.image", "截图识别精度优化中，暂时关闭")
+        self.import_button.setEnabled(SCREENSHOT_IMPORT_ENABLED)
+        self.import_button.setIcon(qta.icon("fa5s.image", color=COLORS["faint"]))
+        self.import_button.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips, True)
         self.undo_button = self._tool_button("fa5s.undo-alt", "撤销")
         self.reset_button = self._tool_button("fa5s.sync-alt", "恢复初始盘面")
         self.zoom_out_button = self._tool_button("fa5s.search-minus", "缩小")
@@ -712,6 +718,12 @@ class MainWindow(QMainWindow):
         )
 
     def import_screenshot(self) -> None:
+        if not SCREENSHOT_IMPORT_ENABLED:
+            self.stage.show_toast(
+                "截图识别功能暂时关闭，请先使用种子生成并手动同步进度。",
+                duration_ms=4200,
+            )
+            return
         path, _ = QFileDialog.getOpenFileName(
             self,
             "导入 Hexcells Infinite 截图",
