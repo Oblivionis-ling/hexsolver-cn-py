@@ -11,23 +11,26 @@ from hexsolver_cn.seed_workflow import Difficulty, GeneratorFidelity, SeedReques
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_ROOT = PROJECT_ROOT.parent
-EASY_FIXTURE = WORKSPACE_ROOT / "reverse_harness" / "exports" / "easy_00000001_v1.tsv"
-HARD_FIXTURE = WORKSPACE_ROOT / "reverse_harness" / "exports" / "hard_00000001_v4.tsv"
-ORIGINAL_ASSEMBLY = (
-    WORKSPACE_ROOT
-    / "reverse_harness"
-    / "game"
-    / "Hexcells Infinite_Data"
-    / "Managed"
-    / "Assembly-CSharp.dll.orig"
-)
+FIXTURE_DIR = PROJECT_ROOT / "tests" / "fixtures"
+EASY_FIXTURE = FIXTURE_DIR / "easy_00000001_v1.tsv"
+HARD_FIXTURE = FIXTURE_DIR / "hard_00000001_v4.tsv"
+
+
+class FixtureHeadlessEasyRunner(HeadlessEasyRunner):
+    """Exercise process routing without requiring proprietary game files."""
+
+    def validate(self) -> None:
+        return
 
 
 class OfflineGenerationTests(unittest.TestCase):
     def test_easy_headless_core_matches_original_seed_one_exactly(self) -> None:
         expected = EASY_FIXTURE.read_text(encoding="utf-8-sig")
-        runner = HeadlessEasyRunner(PROJECT_ROOT / "managed_core", ORIGINAL_ASSEMBLY)
+        runner = HeadlessEasyRunner.discover()
+        if not runner.assembly_path.is_file():
+            self.skipTest(
+                "需要本机 Hexcells Infinite 的 Assembly-CSharp.dll 才能执行 Easy 集成校验。"
+            )
 
         actual = runner.generate_tsv(1)
 
@@ -58,9 +61,9 @@ class OfflineGenerationTests(unittest.TestCase):
             calls.append(list(args))
             return subprocess.CompletedProcess(args, 0, fixture, "")
 
-        runner = HeadlessEasyRunner(
+        runner = FixtureHeadlessEasyRunner(
             PROJECT_ROOT / "managed_core",
-            ORIGINAL_ASSEMBLY,
+            PROJECT_ROOT / "tests" / "fixtures" / "not-used.dll",
             process_runner=fake_process,
         )
 

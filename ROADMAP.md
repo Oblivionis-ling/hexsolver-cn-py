@@ -2,7 +2,7 @@
 
 当前基线：`0.4.2`
 
-完整开发清单和一致性验收门槛见 [SEED_SOLVER_PLAN.md](./SEED_SOLVER_PLAN.md)。本文件只保留版本级路线。
+完整开发清单和一致性验收门槛见 [生成器实现计划](./docs/generator/IMPLEMENTATION_PLAN.md)。本文件只保留版本级路线。
 
 ## 0.2.x：游戏风格解题台
 

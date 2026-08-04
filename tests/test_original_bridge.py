@@ -21,10 +21,17 @@ from hexsolver_cn.solver import HexReasoningSolver
 from hexsolver_cn.unity_random import UnityRandom, float32_bits
 
 
-WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
-FIXTURE_PATH = WORKSPACE_ROOT / "reverse_harness" / "exports" / "hard_00000001_v4.tsv"
-EASY_FIXTURE_PATH = WORKSPACE_ROOT / "reverse_harness" / "exports" / "easy_00000001_v1.tsv"
-GAME_DIR = WORKSPACE_ROOT / "reverse_harness" / "game"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+FIXTURE_DIR = PROJECT_ROOT / "tests" / "fixtures"
+FIXTURE_PATH = FIXTURE_DIR / "hard_00000001_v4.tsv"
+EASY_FIXTURE_PATH = FIXTURE_DIR / "easy_00000001_v1.tsv"
+
+
+class FixtureOriginalGameBridgeRunner(OriginalGameBridgeRunner):
+    """Test the export contract without requiring an installed game copy."""
+
+    def validate(self) -> None:
+        return
 
 
 class FixtureRunner:
@@ -160,7 +167,10 @@ class OriginalExportTests(unittest.TestCase):
             export_path.write_text(self.text, encoding="utf-8")
             return subprocess.CompletedProcess(args, 0, "", "")
 
-        runner = OriginalGameBridgeRunner(GAME_DIR, process_runner=fake_process)
+        runner = FixtureOriginalGameBridgeRunner(
+            PROJECT_ROOT / "tests" / "fixtures" / "fake-game",
+            process_runner=fake_process,
+        )
         returned = runner.generate_tsv(1)
 
         self.assertIn("SEED\t00000001", returned)

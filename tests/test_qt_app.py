@@ -79,10 +79,7 @@ class QtAppWorkflowTests(unittest.TestCase):
         fixture = (
             os.path.join(
                 os.path.dirname(__file__),
-                "..",
-                "..",
-                "reverse_harness",
-                "exports",
+                "fixtures",
                 "hard_00000001_v4.tsv",
             )
         )

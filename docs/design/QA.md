@@ -2,23 +2,21 @@
 
 **Source visual truth**
 
-- `C:\Users\Ling\.codex\generated_images\019fc1c3-12c4-7343-a741-cd7c57b92569\exec-c653b146-7ca2-432c-a6cd-e791dcef66f2.png`
+- 选定的方案 2 本地设计参考图；参考资产不在公开仓库中重复分发。
 - Source pixels: `1487 × 1058`.
 
 **Rendered implementation**
 
-- `D:\Desktop\HexInfinite\hexsolver_cn_py\tests\reports\ui-hard-seed1-runtime.png`：Hard seed 1，原版最终盘面，下一步及完整中文理由。
-- `D:\Desktop\HexInfinite\hexsolver_cn_py\tests\reports\ui-easy-seed1-runtime.png`：Easy seed 1，226 格大盘与初始公开信息。
-- `D:\Desktop\HexInfinite\hexsolver_cn_py\tests\reports\ui-hard-seed1-runtime-small.png`：Hard seed 1，`1120 × 760` 窄窗口。
-- `D:\Desktop\HexInfinite\hexsolver_cn_py\tests\reports\ui-hard-seed1-progress15.png`：应用 15 步后的动态数字提示、历史和下一步理由。
-- `D:\Desktop\HexInfinite\hexsolver_cn_py\tests\reports\ui-option-2-pass5@2x.png`
+- [`../images/hard-seed1.png`](../images/hard-seed1.png)：Hard seed 1，已修正棋盘方向和左右斜向标签。
+- [`../images/easy-seed1.png`](../images/easy-seed1.png)：Easy seed 1，226 格大盘与初始公开信息。
+- [`../images/ui-overview.png`](../images/ui-overview.png)：最终双栏信息架构与操作状态。
 - Implementation pixels: `2880 × 2048`.
 - Logical viewport: `1440 × 1024` at device pixel ratio `2.0`.
-- Narrow-window evidence: `D:\Desktop\HexInfinite\hexsolver_cn_py\tests\reports\ui-small-1120x760@2x.png`, logical viewport `1120 × 760` at device pixel ratio `2.0`.
+- `1120 × 760` 窄窗口和逐步过程的中间证据保存在本地日期归档，不进入公开仓库。
 
 **Normalized comparison**
 
-- `D:\Desktop\HexInfinite\hexsolver_cn_py\tests\reports\ui-option-2-comparison-pass5.png`
+- 最终并排比较图保存在本地日期归档；仓库只保留三张可公开的最终状态图。
 - The source was resampled to `1440 × 1024`; the implementation was downsampled from `2880 × 2048` to the same `1440 × 1024`. The two normalized frames were placed side by side in one `2880 × 1024` comparison image.
 - State: seed `00000001`, Easy selected, visible next-step target and explanation.
 
@@ -42,25 +40,25 @@ The current Hard runtime capture now shows the same intended content class as th
 
 - Earlier P1: the first offscreen Qt capture did not load Windows Chinese fonts, so labels appeared blank.
 - Fix: capture with the Windows Qt platform and verify the rendered font families in the real desktop surface.
-- Post-fix evidence: `tests/reports/ui-option-2-pass1-windows.png`.
+- Post-fix evidence: intermediate capture archived locally.
 - Earlier P1: primary button backgrounds were not painted by the inherited stylesheet, leaving white text on pale buttons.
 - Fix: give difficulty, generate, next, and apply buttons explicit state styles.
-- Post-fix evidence: `tests/reports/ui-option-2-pass3.png`.
+- Post-fix evidence: intermediate capture archived locally.
 
 ### Pass 2
 
 - Earlier P2: generated line-clue anchors overlapped the center of the board.
 - Fix: use the original runtime-exported line anchor and apply family-specific rotation.
-- Post-fix evidence: `tests/reports/ui-option-2-pass3.png`.
+- Post-fix evidence: intermediate capture archived locally.
 - Earlier P2: the implementation capture was constrained by desktop work area and did not match the source aspect ratio.
 - Fix: capture a fixed `1440 × 1024` logical client area and normalize density before comparison.
-- Post-fix evidence: `tests/reports/ui-option-2-pass4@2x.png` and the pass-4 comparison.
+- Post-fix evidence: intermediate capture and normalized comparison archived locally.
 
 ### Pass 3
 
 - Earlier P2: the history trail used generic hex icons without step numbers and the rail was wider than the selected source.
 - Fix: add numbered hex step markers, center the manual-marking header, set the rail to `300` logical pixels, and tighten board-stage padding.
-- Post-fix evidence: `tests/reports/ui-option-2-pass5@2x.png` and `tests/reports/ui-option-2-comparison-pass5.png`.
+- Post-fix evidence: [`../images/ui-overview.png`](../images/ui-overview.png).
 
 ## Follow-up polish
 
@@ -70,7 +68,7 @@ The current Hard runtime capture now shows the same intended content class as th
 
 - Regression found after the board Y-axis correction: diagonal clue labels retained their pre-mirror left/right family.
 - Fix: swap only the rendered diagonal label families during original-export conversion while preserving the original constraint rays.
-- Verification: Hard seed 1 now matches the official diagonal label slopes, with a dedicated bridge regression test.
+- Verification: [`../images/hard-seed1.png`](../images/hard-seed1.png) and a dedicated bridge regression test.
 
 ## Implementation checklist
 

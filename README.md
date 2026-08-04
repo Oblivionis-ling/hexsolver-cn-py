@@ -4,6 +4,8 @@
 
 这是一个面向 `Hexcells Infinite` 的 Windows 中文逐步求解器。输入种子号并选择 Easy/Hard 后，程序会在本地复刻原版地图，不再启动 `Hexcells Infinite.exe`；你可以手动同步当前进度，然后每次只获取一个必然步骤和中文理由。
 
+![Hard seed 1 当前界面](docs/images/hard-seed1.png)
+
 ## 已可用
 
 - 方案 2 双栏界面：左侧六边形控制轨，右侧大棋盘。
@@ -113,6 +115,8 @@ conda run -n hexsolver-cn python main.py
 
 当前自动测试覆盖 TSV 合约、两套交错坐标相位、官方 Y 轴方向、Easy/Hard 样本、Unity RNG 位模式、默认后端不启动游戏、揭示/撤销、完整逐步回放、后台生成和 Qt 主流程。Easy/Hard seed 1–50 及两个八位边界种子已做原版逐字段差分；代表种子还会完整解到零未知格并逐步核对私有答案。
 
+仓库自带 `tests/fixtures/` 的 Easy/Hard seed 1 结构化夹具。没有原版程序集时，Easy 托管核心的真实集成项会明确跳过，其余单元测试和 Hard 离线测试仍可运行。
+
 ## 架构
 
 ```text
@@ -150,3 +154,11 @@ HexReasoningSolver.next_step()
 - `src/hexsolver_cn/hard_generator.py`：Hard 初始形状、颜色与 Unity 随机序列。
 - `managed_core/`：C# 最小 Unity API 兼容层、Easy 宿主和一键构建脚本。
 - `tools/doctor.py`：离线后端诊断；原版启动差分必须显式启用。
+
+## 文档
+
+- [开发历史](DEVELOPMENT_HISTORY.md)：从 `0.1.0` 截图原型到 `0.4.2` 离线精确生成器。
+- [工作区说明](docs/WORKSPACE.md)：本地目录、专有文件边界、清理与恢复规则。
+- [求解算法](docs/solver/ALGORITHM.md)：局部规则、CP-SAT 和全局反证。
+- [种子开发清单](docs/generator/IMPLEMENTATION_PLAN.md)：实现模块与验收标准。
+- [完整文档索引](docs/README.md)。
