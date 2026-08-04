@@ -1,8 +1,19 @@
 # HexInfinite 种子求解器
 
-当前版本：`0.4.3`
+当前版本：`0.5.0`
 
 这是一个面向 `Hexcells Infinite` 的 Windows 中文逐步求解器。输入种子号并选择 Easy/Hard 后，程序会在本地复刻原版地图，不再启动 `Hexcells Infinite.exe`；你可以手动同步当前进度，然后每次只获取一个必然步骤和中文理由。
+
+## 下载 Windows 单文件版
+
+从 [GitHub Release v0.5.0](https://github.com/Oblivionis-ling/hexsolver-cn-py/releases/tag/v0.5.0) 下载：
+
+- `HexInfiniteSolver-0.5.0-windows-x64.exe`
+- `HexInfiniteSolver-0.5.0-windows-x64.exe.sha256`
+
+无需安装 Python、Conda 或项目依赖，下载后直接双击 EXE。`0.5.0` 只封装运行环境和项目可再分发文件，窗口布局、交互、生成器及求解器逻辑均与源码版相同。
+
+系统要求：Windows 10/11 x64。Hard 完全离线可用；Easy 仍需要本机合法安装 Steam 版 `Hexcells Infinite`，程序只读其 `Assembly-CSharp.dll` 并校验版本，不会把原游戏 DLL、EXE 或存档打进安装包。由于当前成品未做商业代码签名，Windows 首次下载时可能显示 SmartScreen 提示；请用 Release 同时提供的 SHA-256 文件核对完整性。
 
 ![Hard seed 1 当前界面](docs/images/hard-seed1.png)
 
@@ -40,11 +51,15 @@ Easy 托管程序集固定检查以下基线：
 D:\Desktop\HexInfinite\reverse_harness\game
 ```
 
-当前验证结果：Easy/Hard seed 1–50 的最终 TSV 均逐字段一致，并额外通过 `00000000`、`99999999` 两个边界种子；Hard 样本覆盖五种地图形状。`0.4.1` 修正了 Unity 世界坐标到 Qt 画布时 Y 轴方向相反造成的棋盘上下镜像；`0.4.2` 同步交换了镜像后的左右斜向标签，避免标签方向指向错误的条件线；`0.4.3` 将所有步骤理由升级为带条件、坐标、计数公式、排列统计和假设反证证据的详细推理。seed 1/2 已与现有官方截图逐个核对轮廓和线索方位。`reverse_harness` 中的原版运行时桥只保留为显式差分校验工具，不在默认产品链路中。
+当前验证结果：Easy/Hard seed 1–50 的最终 TSV 均逐字段一致，并额外通过 `00000000`、`99999999` 两个边界种子；Hard 样本覆盖五种地图形状。`0.4.1` 修正了 Unity 世界坐标到 Qt 画布时 Y 轴方向相反造成的棋盘上下镜像；`0.4.2` 同步交换了镜像后的左右斜向标签；`0.4.3` 将所有步骤理由升级为详细可核查推理；`0.5.0` 在不修改 UI 和核心逻辑的前提下封装为 Windows x64 单文件应用，并用成品自身创建真实 UI、生成 Easy/Hard seed 1、核对第一步后退出。seed 1/2 已与现有官方截图逐个核对轮廓和线索方位。`reverse_harness` 中的原版运行时桥只保留为显式差分校验工具，不在默认产品链路中。
 
 性能边界：Easy 通常不到 1 秒；Hard 会忠实重放原版的多轮可解性验证与冗余线索裁剪，小图约数秒，少数复杂种子可能需要几十秒。生成始终在 UI 后台线程中执行。
 
 ## 启动
+
+普通用户优先使用 Release 中的 `HexInfiniteSolver-0.5.0-windows-x64.exe`，直接双击即可。
+
+以下方式用于源码开发：
 
 直接双击 `启动求解器.cmd`。首次启动会自动创建项目环境、安装依赖并构建 Easy 托管核心，之后会先完成离线诊断再打开界面。
 
@@ -122,6 +137,14 @@ conda run -n hexsolver-cn python main.py
 .\test.cmd
 ```
 
+构建并验证 0.5.0 单文件成品：
+
+```powershell
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\build_app.ps1
+```
+
+构建脚本会执行源码测试、构建 Easy 托管核心、生成单文件 EXE、检查归档不含原游戏程序集，并启动真实成品完成 UI + Easy/Hard seed 1 冒烟测试。详细边界见 [Windows 打包与发布](docs/PACKAGING.md)。
+
 当前自动测试覆盖 TSV 合约、两套交错坐标相位、官方 Y 轴方向、Easy/Hard 样本、Unity RNG 位模式、默认后端不启动游戏、揭示/撤销、完整逐步回放、五类详细推理理由、长文本滚动显示、后台生成和 Qt 主流程。Easy/Hard seed 1–50 及两个八位边界种子已做原版逐字段差分；代表种子还会完整解到零未知格并逐步核对私有答案。
 
 仓库自带 `tests/fixtures/` 的 Easy/Hard seed 1 结构化夹具。没有原版程序集时，Easy 托管核心的真实集成项会明确跳过，其余单元测试和 Hard 离线测试仍可运行。
@@ -163,11 +186,13 @@ HexReasoningSolver.next_step()
 - `src/hexsolver_cn/hard_generator.py`：Hard 初始形状、颜色与 Unity 随机序列。
 - `managed_core/`：C# 最小 Unity API 兼容层、Easy 宿主和一键构建脚本。
 - `tools/doctor.py`：离线后端诊断；原版启动差分必须显式启用。
+- `packaging/`：0.5.0 Windows 单文件构建、图标/版本资源和成品冒烟测试入口。
 
 ## 文档
 
-- [开发历史](DEVELOPMENT_HISTORY.md)：从 `0.1.0` 截图原型到 `0.4.3` 可核查逐步解释。
+- [开发历史](DEVELOPMENT_HISTORY.md)：从 `0.1.0` 截图原型到 `0.5.0` Windows 单文件发布。
 - [工作区说明](docs/WORKSPACE.md)：本地目录、专有文件边界、清理与恢复规则。
 - [求解算法](docs/solver/ALGORITHM.md)：局部规则、CP-SAT 和全局反证。
+- [Windows 打包与发布](docs/PACKAGING.md)：单文件内容、构建、验证和专有文件边界。
 - [种子开发清单](docs/generator/IMPLEMENTATION_PLAN.md)：实现模块与验收标准。
 - [完整文档索引](docs/README.md)。

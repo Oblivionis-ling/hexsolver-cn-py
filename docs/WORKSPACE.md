@@ -32,6 +32,7 @@ F:\SteamLibrary\steamapps\common\Hexcells Infinite
 
 - `.conda_env/`：当前一键启动环境，可由 `run.ps1` 重建；
 - `managed_core/bin/`：Easy 托管核心构建产物，可由 `managed_core/build.ps1` 重建；
+- `build/`、`dist/`：0.5.0 PyInstaller 中间目录和单文件成品，可由 `packaging/build_app.ps1` 重建；
 - `tests/images/`、`tests/labels/`：含原版游戏截图的 OCR 本地数据；
 - `tests/reports/`：临时视觉 QA 输出；
 - `.vscode/`：打开仓库自身时使用的个人编辑器设置。
@@ -56,6 +57,8 @@ Easy 托管核心的真实集成校验仍需要合法安装中的 `Assembly-CSha
 2. 其次读取本地 `reverse_harness` 的只读原始程序集；
 3. 最后读取已知 Steam 安装路径。
 
+打包版还会从 EXE 同目录和默认 Steam 安装目录查找程序集；无论来源如何，哈希不匹配都会拒绝运行 Easy。Hard 不需要该程序集。
+
 找不到程序集时，只有这一项集成测试会明确跳过；其余单元测试和 Hard 离线测试仍可执行。
 
 ## 2026-08-05 整理记录
@@ -72,5 +75,6 @@ Easy 托管核心的真实集成校验仍需要合法安装中的 `Assembly-CSha
 
 - 原游戏安装和存档永不作为清理目标。
 - 游戏二进制、私有运行时、OCR 截图和本地环境永不上传。
+- Release 只上传单文件 EXE 和 SHA-256；构建过程会检查归档不含 `Assembly-CSharp.dll`。
 - 不确定是否有价值的内容先移动到 `_archive/YYYY-MM-DD-*`，验证稳定后再由人工决定是否彻底删除。
 - 只有缓存、日志和可完全重建的临时文件允许直接删除。

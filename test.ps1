@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pythonExe = Join-Path $projectRoot ".conda_env\python.exe"
 if (-not (Test-Path -LiteralPath $pythonExe -PathType Leaf)) {
-    throw "找不到项目 Python：$pythonExe。"
+    throw "Project Python not found: $pythonExe."
 }
 
 $env:PYTHONPATH = Join-Path $projectRoot "src"

@@ -5,7 +5,7 @@ import sys
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import qtawesome as qta
 from PySide6.QtCore import QPointF, QRegularExpression, QSize, Qt, QThread, QTimer, Signal
@@ -32,7 +32,6 @@ from PySide6.QtWidgets import (
 
 from .board_view import HexBoardView
 from .demo_board import build_demo_board
-from .detector import DetectionError, HexImageDetector
 from .models import Board, CellVisualType, Coord, MoveAction, SuggestedMove
 from .original_bridge import build_default_seed_registry
 from .seed_workflow import Difficulty, SeedGeneratorRegistry, SeedRequest
@@ -40,6 +39,10 @@ from .session import BoardStateError, InteractivePuzzleSession, StateChange
 from .solver import HexReasoningSolver, SolverError
 from .theme import COLORS, app_stylesheet
 from .widgets import ChamferPanel, HexCounterBadge, StateButton
+
+
+if TYPE_CHECKING:
+    from .detector import HexImageDetector
 
 
 SCREENSHOT_IMPORT_ENABLED = False
@@ -197,7 +200,7 @@ class MainWindow(QMainWindow):
         self.current_seed: Optional[SeedRequest] = None
         self.selected_state = CellVisualType.HIDDEN
         self.history: list[HistoryEntry] = []
-        self._detector: Optional[HexImageDetector] = None
+        self._detector: Optional["HexImageDetector"] = None
         self._generation_thread: Optional[SeedGenerationThread] = None
 
         root = QWidget()
@@ -724,6 +727,8 @@ class MainWindow(QMainWindow):
                 duration_ms=4200,
             )
             return
+        from .detector import DetectionError, HexImageDetector
+
         path, _ = QFileDialog.getOpenFileName(
             self,
             "导入 Hexcells Infinite 截图",

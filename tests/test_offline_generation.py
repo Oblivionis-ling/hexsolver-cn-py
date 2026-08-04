@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
 import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from hexsolver_cn.hard_offline import OfflineHardBackend, OfflineHardGenerator
 from hexsolver_cn.managed_easy import HeadlessEasyBackend, HeadlessEasyRunner
@@ -76,6 +80,21 @@ class OfflineGenerationTests(unittest.TestCase):
         launched = Path(calls[0][0])
         self.assertEqual("HexcellsHeadless.exe", launched.name)
         self.assertNotEqual("Hexcells Infinite.exe", launched.name)
+
+    def test_frozen_easy_runner_uses_bundle_managed_core(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_root = Path(temp_dir)
+            assembly = bundle_root / "Assembly-CSharp.dll"
+            assembly.write_bytes(b"test-only")
+            with (
+                patch.dict(os.environ, {"HEXCELLS_ASSEMBLY": str(assembly)}),
+                patch.object(sys, "frozen", True, create=True),
+                patch.object(sys, "_MEIPASS", str(bundle_root), create=True),
+            ):
+                runner = HeadlessEasyRunner.discover()
+
+            self.assertEqual(bundle_root / "managed_core", runner.core_dir)
+            self.assertEqual(assembly, runner.assembly_path)
 
 
 if __name__ == "__main__":

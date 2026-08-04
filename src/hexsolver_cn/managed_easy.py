@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Callable
 
@@ -51,11 +52,19 @@ class HeadlessEasyRunner:
 
     @classmethod
     def discover(cls) -> "HeadlessEasyRunner":
-        project_root = Path(__file__).resolve().parents[2]
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            project_root = Path(sys._MEIPASS).resolve()
+        else:
+            project_root = Path(__file__).resolve().parents[2]
         workspace_root = project_root.parent
         configured = os.environ.get("HEXCELLS_ASSEMBLY")
+        executable_dir = Path(sys.executable).resolve().parent
+        program_files_x86 = Path(
+            os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+        )
         candidates = [
             Path(configured) if configured else None,
+            executable_dir / "Assembly-CSharp.dll",
             workspace_root
             / "reverse_harness"
             / "game"
@@ -63,6 +72,14 @@ class HeadlessEasyRunner:
             / "Managed"
             / "Assembly-CSharp.dll.orig",
             Path(r"F:\SteamLibrary\steamapps\common\Hexcells Infinite")
+            / "Hexcells Infinite_Data"
+            / "Managed"
+            / "Assembly-CSharp.dll",
+            program_files_x86
+            / "Steam"
+            / "steamapps"
+            / "common"
+            / "Hexcells Infinite"
             / "Hexcells Infinite_Data"
             / "Managed"
             / "Assembly-CSharp.dll",
@@ -121,8 +138,8 @@ class HeadlessEasyRunner:
         self._ensure_built()
         if not self.assembly_path.is_file():
             raise SeedGenerationUnavailable(
-                "找不到原版 Assembly-CSharp.dll。请保留 reverse_harness 隔离副本，"
-                "或通过 HEXCELLS_ASSEMBLY 指定原版程序集。"
+                "找不到原版 Assembly-CSharp.dll。请确认 Steam 版 Hexcells Infinite 已安装，"
+                "或通过 HEXCELLS_ASSEMBLY 指定原版程序集；打包版不会分发游戏文件。"
             )
         if _sha256(self.assembly_path) != GAME_ASSEMBLY_SHA256:
             raise SeedGenerationUnavailable(
