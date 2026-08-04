@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from hexsolver_cn.app import MainWindow  # noqa: E402
-from hexsolver_cn.models import CellVisualType  # noqa: E402
+from hexsolver_cn.models import CellVisualType, MoveAction, SuggestedMove  # noqa: E402
 from hexsolver_cn.original_bridge import (  # noqa: E402
     OriginalRuntimeHardBackend,
 )
@@ -49,6 +49,26 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.assertIn(after, {CellVisualType.BLUE, CellVisualType.BLACK})
         self.assertIsNone(self.window.current_move)
         self.assertTrue(self.window.history[-1].state_change)
+
+    def test_step_card_preserves_long_multiline_reason_in_scrollable_view(self) -> None:
+        reason = "推理过程：\n" + "\n".join(
+            f"{index}. 这是第 {index} 条可核查条件与计算说明。" for index in range(1, 25)
+        )
+        move = SuggestedMove(
+            coord=(0, 0),
+            action=MoveAction.MARK_BLUE,
+            reason=reason,
+            source="全局求解",
+        )
+
+        self.window._update_step_card(move)
+        self.window.show()
+        self.app.processEvents()
+
+        self.assertEqual(reason, self.window.step_reason.toPlainText())
+        self.assertGreater(self.window.step_reason.verticalScrollBar().maximum(), 0)
+        self.assertEqual(0, self.window.step_reason.verticalScrollBar().value())
+        self.assertTrue(self.window.apply_button.isEnabled())
 
     def test_manual_mark_and_undo_round_trip(self) -> None:
         coord = next(

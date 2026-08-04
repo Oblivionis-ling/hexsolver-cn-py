@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSpacerItem,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -414,11 +415,18 @@ class MainWindow(QMainWindow):
         heading.addWidget(self.step_coord)
         layout.addLayout(heading)
 
-        self.step_reason = QLabel("手动同步到卡住的位置后，获取一个必然成立的步骤。")
-        self.step_reason.setWordWrap(True)
-        self.step_reason.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        self.step_reason.setMinimumHeight(54)
-        self.step_reason.setStyleSheet(f"font-size: 12px; color: {COLORS['muted']};")
+        self.step_reason = QTextEdit()
+        self.step_reason.setReadOnly(True)
+        self.step_reason.setPlainText("手动同步到卡住的位置后，获取一个必然成立的步骤。")
+        self.step_reason.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.step_reason.setMinimumHeight(156)
+        self.step_reason.setMaximumHeight(228)
+        self.step_reason.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.step_reason.document().setDocumentMargin(1)
+        self.step_reason.setStyleSheet(
+            f"QTextEdit {{ font-size: 12px; color: {COLORS['muted']}; background: transparent; "
+            "border: none; padding: 0; }}"
+        )
         layout.addWidget(self.step_reason)
 
         actions = QHBoxLayout()
@@ -737,13 +745,14 @@ class MainWindow(QMainWindow):
         if move is None:
             self.step_title.setText("下一步")
             self.step_coord.setText("等待计算")
-            self.step_reason.setText("手动同步到卡住的位置后，获取一个必然成立的步骤。")
+            self.step_reason.setPlainText("手动同步到卡住的位置后，获取一个必然成立的步骤。")
             self.apply_button.setEnabled(False)
             return
         action = "标记蓝色" if move.action is MoveAction.MARK_BLUE else "标记排除"
         self.step_title.setText(action)
         self.step_coord.setText(str(move.coord))
-        self.step_reason.setText(move.reason)
+        self.step_reason.setPlainText(move.reason)
+        self.step_reason.verticalScrollBar().setValue(0)
         self.apply_button.setEnabled(True)
 
     def _update_counts(self) -> None:
