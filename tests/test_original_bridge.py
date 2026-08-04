@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from hexsolver_cn.models import CellVisualType, ClueType, MoveAction
+from hexsolver_cn.models import CellVisualType, ClueType, LineFamily, MoveAction
 from hexsolver_cn.original_bridge import (
     ExportCoordinateSystem,
     OriginalGameBridgeRunner,
@@ -115,6 +115,18 @@ class OriginalExportTests(unittest.TestCase):
         lower_center = board.get_cell(coordinate_system.to_axial(lower.raw_coord)).center
 
         self.assertLess(upper_center[1], lower_center[1])
+
+    def test_diagonal_column_labels_are_mirrored_with_the_board(self) -> None:
+        export = parse_original_export(self.text)
+        board, _ = board_from_original_export(export)
+
+        for column, row in zip(export.columns, board.row_clues):
+            if column.name == "Column Number Diagonal Right":
+                self.assertIs(LineFamily.DOWN_LEFT, row.family)
+                self.assertEqual("左下斜", row.family_label())
+            elif column.name == "Column Number Diagonal Left":
+                self.assertIs(LineFamily.DOWN_RIGHT, row.family)
+                self.assertEqual("右下斜", row.family_label())
 
     def test_backend_checks_returned_seed(self) -> None:
         runner = FixtureRunner(self.text)

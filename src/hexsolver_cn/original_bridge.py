@@ -175,8 +175,12 @@ def _center(coord: Coord) -> tuple[float, float]:
 
 _COLUMN_SPECS: Mapping[str, tuple[RawCoord, LineFamily]] = {
     "Column Number": ((0, -2), LineFamily.HORIZONTAL),
-    "Column Number Diagonal Right": ((1, -1), LineFamily.DOWN_RIGHT),
-    "Column Number Diagonal Left": ((-1, -1), LineFamily.DOWN_LEFT),
+    # The original names describe the diagonal label before Unity world Y is
+    # reflected into Qt scene Y.  Reflection swaps the two visible diagonal
+    # families, but the ray directions that select constrained cells stay in
+    # the original doubled-coordinate system.
+    "Column Number Diagonal Right": ((1, -1), LineFamily.DOWN_LEFT),
+    "Column Number Diagonal Left": ((-1, -1), LineFamily.DOWN_RIGHT),
 }
 
 

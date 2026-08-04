@@ -66,6 +66,12 @@ The current Hard runtime capture now shows the same intended content class as th
 
 - P3: the orange generate control is rectangular with chamfered surroundings rather than using the source mock's deeper downward point.
 
+### Pass 4
+
+- Regression found after the board Y-axis correction: diagonal clue labels retained their pre-mirror left/right family.
+- Fix: swap only the rendered diagonal label families during original-export conversion while preserving the original constraint rays.
+- Verification: Hard seed 1 now matches the official diagonal label slopes, with a dedicated bridge regression test.
+
 ## Implementation checklist
 
 - [x] Selected direction 2 reproduced as a functional two-column desktop UI.
@@ -74,7 +80,7 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] `1120 × 760` layout-resilience capture completed.
 - [x] Hard seed 1 at `1440 × 1024` and `1120 × 760` passed visual inspection.
 - [x] Easy seed 1 dense-board capture passed visual inspection.
-- [x] Twenty-three automated core, bridge, solver and Qt workflow tests pass.
+- [x] Thirty automated core, bridge, solver and Qt workflow tests pass.
 - [x] No actionable P0/P1/P2 visual findings remain.
 
 final result: passed
