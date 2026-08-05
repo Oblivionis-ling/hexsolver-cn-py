@@ -25,11 +25,11 @@
 No actionable P0, P1, or P2 differences remain for the selected information architecture.
 
 - Fonts and typography: Chinese UI uses `Microsoft YaHei UI`; display numbers use `Bahnschrift`. Weight, hierarchy, line wrapping, and contrast remain legible at both tested window sizes. The pairing preserves the source's geometric-number and clean-Chinese-label treatment.
-- Spacing and layout rhythm: the implementation keeps the source's narrow left solving rail, large right board stage, separated seed/stat/manual/history/next-step groups, generous board whitespace, chamfered surfaces, thin borders, and light shadows. At `1120 × 760`, the history region contracts and scrolls while persistent controls remain visible.
+- Spacing and layout rhythm: the implementation keeps the source's narrow left solving rail, large right board stage, separated seed/stat/manual/next-step groups, generous board whitespace, chamfered surfaces, thin borders, and light shadows. In `0.6.1`, the next-step panel consumes the freed history space; at `1120 × 760`, the reason area remains at least 220 px high while persistent controls stay visible.
 - Colors and tokens: unknown, blue, clue, background, border, selected-step, and disabled states map consistently to the source orange/cyan/charcoal/light-gray palette. Text contrast remains usable.
 - Image quality and asset fidelity: the selected design contains no photographic or illustrative raster assets. The board is implemented as interactive native geometry, not a placeholder image. General controls use the QtAwesome icon library; the numbered step marker is product data rendered in the same hexagonal grammar.
-- Copy and content: seed, difficulty, remaining count, manual states, step history, action, coordinate, reason, runtime generation state, and failure recovery are coherent in standalone use. The full Chinese reason remains visible at both tested window sizes.
-- Icons and interaction states: copy, import, undo, reset, zoom, fit, next, apply, selected difficulty, selected manual state, selected history row, and target-cell states are present and visually distinct.
+- Copy and content: seed, difficulty, remaining count, manual states, action, coordinate, reason, runtime generation state, and failure recovery are coherent in standalone use. The full Chinese reason remains available through a substantially larger scrollable area at both tested window sizes.
+- Icons and interaction states: copy, import, undo, reset, zoom, fit, next, apply, selected difficulty, selected manual state, and target-cell states are present and visually distinct.
 - Accessibility: controls use native Qt semantics and keyboard focus behavior, include tooltips, retain high-contrast active states, and use practical click targets. There is no continuous animation that requires reduced-motion handling.
 
 The current Hard runtime capture now shows the same intended content class as the source: a wide irregular generated puzzle and `39` remaining. Easy was separately checked with a much denser 226-cell board; auto-fit keeps the complete puzzle and all line clues visible.
@@ -70,6 +70,13 @@ The current Hard runtime capture now shows the same intended content class as th
 - Fix: swap only the rendered diagonal label families during original-export conversion while preserving the original constraint rays.
 - Verification: [`../images/hard-seed1.png`](../images/hard-seed1.png) and a dedicated bridge regression test.
 
+### Pass 5 (`0.6.1`)
+
+- The left-side step history was removed and the next-step panel now fills the available vertical space.
+- The reason text view has no maximum height, uses a 220 px minimum and 13 px text, and remains scrollable for extreme explanations.
+- Every row-clue item is tracked, forced visible and opaque during board synchronization, and rendered above board cells.
+- Viewport safety margins keep outer clues clear of the mode chip, remaining counter and bottom-right tool rail.
+
 ## Implementation checklist
 
 - [x] Selected direction 2 reproduced as a functional two-column desktop UI.
@@ -78,7 +85,7 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] `1120 × 760` layout-resilience capture completed.
 - [x] Hard seed 1 at `1440 × 1024` and `1120 × 760` passed visual inspection.
 - [x] Easy seed 1 dense-board capture passed visual inspection.
-- [x] Thirty automated core, bridge, solver and Qt workflow tests pass.
+- [x] Forty-five automated core, bridge, solver and Qt workflow tests pass.
 - [x] No actionable P0/P1/P2 visual findings remain.
 
 final result: passed

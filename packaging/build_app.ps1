@@ -17,9 +17,10 @@ $assetScript = Join-Path $projectRoot "packaging\build_assets.py"
 $assetDir = Join-Path $projectRoot "build\package_assets"
 $workDir = Join-Path $projectRoot "build\pyinstaller"
 $distDir = Join-Path $projectRoot "dist"
+$expectedVersion = "0.6.1"
 
 function Write-Step([string]$message) {
-    Write-Host "[HexInfinite 0.5.0] $message" -ForegroundColor Cyan
+    Write-Host "[HexInfinite $expectedVersion] $message" -ForegroundColor Cyan
 }
 
 function Assert-ProjectChild([string]$path) {
@@ -36,8 +37,8 @@ if (-not (Test-Path -LiteralPath $pythonExe -PathType Leaf)) {
 
 Set-Location -LiteralPath $projectRoot
 $version = (Get-Content -Raw -Encoding UTF8 $versionPath).Trim()
-if ($version -ne "0.5.0") {
-    throw "This packaging script only publishes 0.5.0; current VERSION is $version."
+if ($version -ne $expectedVersion) {
+    throw "This packaging script only publishes $expectedVersion; current VERSION is $version."
 }
 $artifactName = "HexInfiniteSolver-$version-windows-x64"
 $artifactPath = Join-Path $distDir "$artifactName.exe"
@@ -103,7 +104,7 @@ if (-not $SkipPackageSmokeTest) {
     Write-Step "Starting the real packaged UI and verifying Easy/Hard seed 1..."
     $previousPlatform = $env:QT_QPA_PLATFORM
     $previousSmokeLog = $env:HEXSOLVER_PACKAGE_SMOKE_LOG
-    $smokeLog = Join-Path $env:TEMP "HexInfiniteSolver-0.5.0-package-smoke.log"
+    $smokeLog = Join-Path $env:TEMP "HexInfiniteSolver-$version-package-smoke.log"
     if (Test-Path -LiteralPath $smokeLog) {
         Remove-Item -LiteralPath $smokeLog -Force
     }

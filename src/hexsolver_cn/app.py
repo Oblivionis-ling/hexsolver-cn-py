@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import os
 import sys
-import math
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import qtawesome as qta
-from PySide6.QtCore import QPointF, QRegularExpression, QSize, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPixmap, QPolygonF, QRegularExpressionValidator
+from PySide6.QtCore import QRegularExpression, QSize, Qt, QThread, QTimer, Signal
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -18,13 +16,9 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QListWidget,
-    QListWidgetItem,
     QMainWindow,
     QPushButton,
-    QScrollArea,
     QSizePolicy,
-    QSpacerItem,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -35,7 +29,7 @@ from .demo_board import build_demo_board
 from .models import Board, CellVisualType, Coord, MoveAction, SuggestedMove
 from .original_bridge import build_default_seed_registry
 from .seed_workflow import Difficulty, SeedGeneratorRegistry, SeedRequest
-from .session import BoardStateError, InteractivePuzzleSession, StateChange
+from .session import BoardStateError, InteractivePuzzleSession
 from .solver import HexReasoningSolver, SolverError
 from .theme import COLORS, app_stylesheet
 from .widgets import ChamferPanel, HexCounterBadge, StateButton
@@ -46,14 +40,6 @@ if TYPE_CHECKING:
 
 
 SCREENSHOT_IMPORT_ENABLED = False
-
-
-@dataclass(frozen=True)
-class HistoryEntry:
-    action: str
-    coord: Optional[Coord]
-    state_change: bool = False
-    initial: bool = False
 
 
 class SeedGenerationThread(QThread):
@@ -199,7 +185,6 @@ class MainWindow(QMainWindow):
         self.current_move: Optional[SuggestedMove] = None
         self.current_seed: Optional[SeedRequest] = None
         self.selected_state = CellVisualType.HIDDEN
-        self.history: list[HistoryEntry] = []
         self._detector: Optional["HexImageDetector"] = None
         self._generation_thread: Optional[SeedGenerationThread] = None
 
@@ -231,7 +216,6 @@ class MainWindow(QMainWindow):
         self.stage.import_button.clicked.connect(self.import_screenshot)
 
         self._load_board(self.session.board, mode_text="界面演示盘 · 非种子生成结果")
-        self._populate_initial_history()
 
     def _build_sidebar(self) -> QWidget:
         sidebar = QWidget()
@@ -244,8 +228,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._build_seed_panel())
         layout.addWidget(self._build_stats_panel())
         layout.addWidget(self._build_manual_panel())
-        layout.addWidget(self._build_history_panel(), 1)
-        layout.addWidget(self._build_step_panel())
+        self.step_panel = self._build_step_panel()
+        layout.addWidget(self.step_panel, 1)
         return sidebar
 
     def _build_seed_panel(self) -> QWidget:
@@ -385,29 +369,9 @@ class MainWindow(QMainWindow):
         layout.addLayout(states)
         return panel
 
-    def _build_history_panel(self) -> QWidget:
-        panel = ChamferPanel(chamfer=14)
-        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(13, 12, 13, 12)
-        layout.setSpacing(6)
-
-        title = QLabel("步骤历史")
-        title.setObjectName("SectionTitle")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
-
-        self.history_list = QListWidget()
-        self.history_list.setIconSize(QSize(30, 34))
-        self.history_list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
-        self.history_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.history_list.itemClicked.connect(self._history_item_clicked)
-        self.history_list.currentRowChanged.connect(self._refresh_history_icons)
-        layout.addWidget(self.history_list, 1)
-        return panel
-
     def _build_step_panel(self) -> QWidget:
         panel = ChamferPanel(chamfer=13, border=COLORS["blue"])
+        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(14, 12, 14, 12)
         layout.setSpacing(5)
@@ -428,15 +392,14 @@ class MainWindow(QMainWindow):
         self.step_reason.setReadOnly(True)
         self.step_reason.setPlainText("手动同步到卡住的位置后，获取一个必然成立的步骤。")
         self.step_reason.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.step_reason.setMinimumHeight(156)
-        self.step_reason.setMaximumHeight(228)
+        self.step_reason.setMinimumHeight(220)
         self.step_reason.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.step_reason.document().setDocumentMargin(1)
         self.step_reason.setStyleSheet(
-            f"QTextEdit {{ font-size: 12px; color: {COLORS['muted']}; background: transparent; "
+            f"QTextEdit {{ font-size: 13px; color: {COLORS['muted']}; background: transparent; "
             "border: none; padding: 0; }}"
         )
-        layout.addWidget(self.step_reason)
+        layout.addWidget(self.step_reason, 1)
 
         actions = QHBoxLayout()
         actions.setSpacing(6)
@@ -504,68 +467,6 @@ class MainWindow(QMainWindow):
         self._update_step_card(None)
         self._update_counts()
 
-    def _populate_initial_history(self) -> None:
-        self.history.clear()
-        self.history_list.clear()
-        known = sorted(
-            (cell.coord for cell in self.session.board.known_blue_cells() if not cell.clue_text),
-            key=lambda coord: (coord[1], coord[0]),
-        )
-        for coord in known[-5:]:
-            self._append_history(HistoryEntry("初始蓝色", coord, initial=True), select=False)
-        if self.history_list.count():
-            self.history_list.setCurrentRow(self.history_list.count() - 1)
-
-    def _append_history(self, entry: HistoryEntry, *, select: bool = True) -> None:
-        self.history.append(entry)
-        coord_text = "" if entry.coord is None else f" {entry.coord}"
-        item = QListWidgetItem(f"{entry.action}{coord_text}")
-        item.setData(Qt.ItemDataRole.UserRole, entry)
-        self.history_list.addItem(item)
-        if select:
-            self.history_list.setCurrentItem(item)
-            self.history_list.scrollToItem(item)
-        self._refresh_history_icons(self.history_list.currentRow())
-
-    def _refresh_history_icons(self, current_row: int) -> None:
-        for row in range(self.history_list.count()):
-            self.history_list.item(row).setIcon(self._step_badge_icon(row + 1, row == current_row))
-
-    @staticmethod
-    def _step_badge_icon(number: int, active: bool) -> QIcon:
-        pixmap = QPixmap(60, 68)
-        pixmap.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        center = QPointF(30.0, 33.0)
-        radius = 24.0
-        points = QPolygonF(
-            [
-                QPointF(
-                    center.x() + radius * math.cos(math.radians(60 * index + 30)),
-                    center.y() + radius * math.sin(math.radians(60 * index + 30)),
-                )
-                for index in range(6)
-            ]
-        )
-        fill = QColor(COLORS["blue"] if active else COLORS["panel_alt"])
-        stroke = QColor(COLORS["blue"] if active else COLORS["muted"])
-        painter.setPen(QPen(stroke, 2.2))
-        painter.setBrush(fill)
-        painter.drawPolygon(points)
-        painter.setPen(QColor(COLORS["white"] if active else COLORS["muted"]))
-        font = QFont("Bahnschrift", 10)
-        font.setWeight(QFont.Weight.DemiBold)
-        painter.setFont(font)
-        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, str(number))
-        painter.end()
-        return QIcon(pixmap)
-
-    def _history_item_clicked(self, item: QListWidgetItem) -> None:
-        entry = item.data(Qt.ItemDataRole.UserRole)
-        if isinstance(entry, HistoryEntry) and entry.coord is not None:
-            self.stage.board_view.set_selected(entry.coord)
-
     def _on_cell_activated(self, coord: Coord) -> None:
         self.stage.board_view.set_selected(coord)
         try:
@@ -578,12 +479,6 @@ class MainWindow(QMainWindow):
         self.current_move = None
         self.stage.board_view.set_target(None)
         self.stage.board_view.sync_state()
-        action = {
-            CellVisualType.HIDDEN: "恢复未知",
-            CellVisualType.BLUE: "标记蓝色",
-            CellVisualType.BLACK: "标记排除",
-        }[change.after]
-        self._append_history(HistoryEntry(action, coord, state_change=True))
         self._update_counts()
         self._update_step_card(None)
 
@@ -611,8 +506,6 @@ class MainWindow(QMainWindow):
         except BoardStateError as exc:
             self.stage.show_toast(str(exc), danger=True)
             return
-        action = "求解器：蓝色" if move.action is MoveAction.MARK_BLUE else "求解器：排除"
-        self._append_history(HistoryEntry(action, move.coord, state_change=True))
         self.current_move = None
         self.stage.board_view.set_target(None)
         self.stage.board_view.sync_state()
@@ -627,11 +520,6 @@ class MainWindow(QMainWindow):
         self.current_move = None
         self.stage.board_view.set_target(None)
         self.stage.board_view.sync_state()
-        for index in range(len(self.history) - 1, -1, -1):
-            if self.history[index].state_change:
-                del self.history[index]
-                self.history_list.takeItem(index)
-                break
         self._update_counts()
         self._update_step_card(None)
 
@@ -639,7 +527,6 @@ class MainWindow(QMainWindow):
         self.session.reset()
         self.current_move = None
         self.stage.board_view.set_board(self.session.board)
-        self._populate_initial_history()
         self._update_counts()
         self._update_step_card(None)
         self.stage.show_toast("已恢复到初始盘面")
@@ -684,14 +571,11 @@ class MainWindow(QMainWindow):
             self.solver,
             private_reveals=puzzle.private_reveals,
         )
-        self.history.clear()
-        self.history_list.clear()
         self._load_board(
             self.session.board,
             mode_text=f"种子 {request.seed:08d} · {request.difficulty.label} · 离线精确生成",
             verified=True,
         )
-        self._populate_initial_history()
         self.stage.show_toast(
             f"生成完成：{len(self.session.board.cells)} 个格子，{len(self.session.board.row_clues)} 条行线索"
         )
@@ -749,10 +633,7 @@ class MainWindow(QMainWindow):
             return
         self.session = InteractivePuzzleSession(board, self.solver)
         self.current_seed = None
-        self.history.clear()
-        self.history_list.clear()
         self._load_board(board, mode_text=f"截图局面 · {Path(path).name}")
-        self._populate_initial_history()
 
     def copy_seed(self) -> None:
         QApplication.clipboard().setText(self.seed_input.text())

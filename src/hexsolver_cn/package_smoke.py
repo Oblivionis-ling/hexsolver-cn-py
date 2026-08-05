@@ -76,6 +76,15 @@ def run_package_smoke_test() -> int:
             raise RuntimeError("打包窗口尺寸与源码版不一致。")
         if window.sidebar.width() != 300:
             raise RuntimeError("打包侧栏宽度与源码版不一致。")
+        if hasattr(window, "history") or hasattr(window, "history_list"):
+            raise RuntimeError("0.6.1 打包界面仍然包含已移除的步骤历史。")
+        if window.step_reason.height() < 400:
+            raise RuntimeError("0.6.1 打包界面的推理原因区域没有获得预期高度。")
+        row_items = window.stage.board_view.row_clue_items
+        if len(row_items) != len(window.session.board.row_clues) or not all(
+            item.isVisible() and item.zValue() > 4 for item in row_items
+        ):
+            raise RuntimeError("0.6.1 打包界面没有保持所有行线索可见。")
         if SCREENSHOT_IMPORT_ENABLED or window.stage.import_button.isEnabled():
             raise RuntimeError("打包版意外启用了尚未开放的截图入口。")
 

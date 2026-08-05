@@ -49,11 +49,44 @@ class QtAppWorkflowTests(unittest.TestCase):
         after = self.window.session.board.get_cell(move.coord).visual_type
         self.assertIn(after, {CellVisualType.BLUE, CellVisualType.BLACK})
         self.assertIsNone(self.window.current_move)
-        self.assertTrue(self.window.history[-1].state_change)
+        self.assertEqual(move.coord, self.window.session.history[-1].coord)
+
+    def test_sidebar_removes_history_and_prioritizes_reason_panel(self) -> None:
+        self.window.show()
+        self.app.processEvents()
+
+        self.assertFalse(hasattr(self.window, "history"))
+        self.assertFalse(hasattr(self.window, "history_list"))
+        self.assertGreaterEqual(self.window.step_reason.height(), 400)
+
+        self.window.resize(1120, 760)
+        self.app.processEvents()
+        self.assertGreaterEqual(self.window.step_reason.height(), 220)
+
+    def test_all_row_clues_remain_visible_above_board_items(self) -> None:
+        view = self.window.stage.board_view
+        expected = [row for row in self.window.session.board.row_clues if row.clue_text]
+
+        self.assertEqual(len(expected), len(view.row_clue_items))
+        self.assertTrue(all(item.isVisible() for item in view.row_clue_items))
+        self.assertTrue(all(item.zValue() > 4 for item in view.row_clue_items))
+        for row in expected:
+            nearest_cell_distance_squared = min(
+                (row.anchor[0] - cell.center[0]) ** 2 + (row.anchor[1] - cell.center[1]) ** 2
+                for cell in self.window.session.board.cells.values()
+            )
+            self.assertGreaterEqual(nearest_cell_distance_squared, 50.0**2)
+        margins = view.viewportMargins()
+        self.assertGreaterEqual(margins.top(), 64)
+        self.assertGreaterEqual(margins.right(), 132)
+
+        view.row_clue_items[0].setVisible(False)
+        view.sync_state()
+        self.assertTrue(view.row_clue_items[0].isVisible())
 
     def test_step_card_preserves_long_multiline_reason_in_scrollable_view(self) -> None:
         reason = "推理过程：\n" + "\n".join(
-            f"{index}. 这是第 {index} 条可核查条件与计算说明。" for index in range(1, 25)
+            f"{index}. 这是第 {index} 条可核查条件与计算说明。" for index in range(1, 81)
         )
         move = SuggestedMove(
             coord=(0, 0),
@@ -136,6 +169,8 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.assertIsNone(self.window._generation_thread)
         self.assertEqual(83, len(self.window.session.board.cells))
         self.assertEqual(9, len(self.window.session.board.row_clues))
+        self.assertEqual(9, len(self.window.stage.board_view.row_clue_items))
+        self.assertTrue(all(item.isVisible() for item in self.window.stage.board_view.row_clue_items))
         self.assertIn("离线精确生成", self.window.stage.mode_chip.text())
         self.assertTrue(self.window.generate_button.isEnabled())
 

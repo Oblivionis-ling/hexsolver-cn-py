@@ -31,6 +31,9 @@ class HexBoardView(QGraphicsView):
         )
         self.setFrameShape(QGraphicsView.Shape.NoFrame)
         self.setStyleSheet("background: transparent; border: none;")
+        # Keep the fitted board and its outer line clues clear of the mode chip,
+        # remaining counter, and bottom-right tool rail drawn by BoardStage.
+        self.setViewportMargins(16, 64, 132, 18)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
@@ -41,6 +44,7 @@ class HexBoardView(QGraphicsView):
         self._radius = 28.0
         self._cell_items: Dict[Coord, QGraphicsPolygonItem] = {}
         self._cell_text_items: Dict[Coord, QGraphicsSimpleTextItem] = {}
+        self._row_clue_items: list[QGraphicsSimpleTextItem] = []
         self._target: Optional[Coord] = None
         self._selected: Optional[Coord] = None
         self._pan_origin: Optional[QPoint] = None
@@ -58,6 +62,7 @@ class HexBoardView(QGraphicsView):
         self._scene.clear()
         self._cell_items.clear()
         self._cell_text_items.clear()
+        self._row_clue_items.clear()
         if self.board is None:
             return
 
@@ -92,6 +97,7 @@ class HexBoardView(QGraphicsView):
             self._position_cell_text(cell.coord)
 
         self._draw_row_clues()
+        self._ensure_row_clues_visible()
         bounds = self._scene.itemsBoundingRect().adjusted(-68, -62, 68, 62)
         self._scene.setSceneRect(bounds)
         self.sync_state()
@@ -119,8 +125,20 @@ class HexBoardView(QGraphicsView):
             text.setTransformOriginPoint(bounds.center())
             text.setRotation(rotation[row.family])
             text.setPos(anchor[0] - bounds.width() / 2.0, anchor[1] - bounds.height() / 2.0)
-            text.setZValue(3)
+            text.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+            text.setZValue(8)
             self._scene.addItem(text)
+            self._row_clue_items.append(text)
+
+    def _ensure_row_clues_visible(self) -> None:
+        for item in self._row_clue_items:
+            item.setVisible(True)
+            item.setOpacity(1.0)
+            item.setZValue(8)
+
+    @property
+    def row_clue_items(self) -> tuple[QGraphicsSimpleTextItem, ...]:
+        return tuple(self._row_clue_items)
 
     def sync_state(self) -> None:
         if self.board is None:
@@ -143,6 +161,7 @@ class HexBoardView(QGraphicsView):
             else:
                 item.setPen(QPen(QColor(COLORS["white"]), 3.2))
                 item.setZValue(1)
+        self._ensure_row_clues_visible()
         self.viewport().update()
 
     def _position_cell_text(self, coord: Coord) -> None:

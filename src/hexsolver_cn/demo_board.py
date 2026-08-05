@@ -47,6 +47,19 @@ def _neighbor_coords(coord: Coord) -> List[Coord]:
     ]
 
 
+def _anchor_beyond_top_endpoint(centers: List[tuple[float, float]]) -> tuple[float, float]:
+    endpoint = min(centers, key=lambda point: (point[1], point[0]))
+    neighbor = min(
+        (point for point in centers if point != endpoint),
+        key=lambda point: (point[0] - endpoint[0]) ** 2 + (point[1] - endpoint[1]) ** 2,
+    )
+    dx = endpoint[0] - neighbor[0]
+    dy = endpoint[1] - neighbor[1]
+    length = math.hypot(dx, dy)
+    offset = CELL_RADIUS * 1.7
+    return endpoint[0] + dx / length * offset, endpoint[1] + dy / length * offset
+
+
 def build_demo_board() -> Board:
     """Build a coherent visual/interaction fixture while seed parity is pending."""
 
@@ -81,9 +94,9 @@ def build_demo_board() -> Board:
 
     row_clues: List[RowClue] = []
     family_specs = [
-        (LineFamily.HORIZONTAL, lambda c: c[1]),
-        (LineFamily.DOWN_RIGHT, lambda c: c[0]),
-        (LineFamily.DOWN_LEFT, lambda c: c[0] + c[1]),
+        (LineFamily.HORIZONTAL, lambda c: c[0]),
+        (LineFamily.DOWN_RIGHT, lambda c: c[0] + c[1]),
+        (LineFamily.DOWN_LEFT, lambda c: c[1]),
     ]
     line_id = 1
     for family, key_fn in family_specs:
@@ -96,7 +109,7 @@ def build_demo_board() -> Board:
                 continue
             clue_number = sum(coord in answer_blue for coord in line)
             centers = [_center(coord) for coord in line]
-            anchor = (sum(x for x, _ in centers) / len(centers), min(y for _, y in centers) - 49.0)
+            anchor = _anchor_beyond_top_endpoint(centers)
             row_clues.append(
                 RowClue(
                     line_id=f"D{line_id}",
