@@ -14,6 +14,7 @@
 - [`ui-v062-hard-seed3-1120x760.png`](ui-v062-hard-seed3-1120x760.png)：0.6.2 最小窗口长推理首屏。
 - [`ui-v062-hard-seed3-1120x760-bottom.png`](ui-v062-hard-seed3-1120x760-bottom.png)：0.6.2 最小窗口滚动到推理末尾。
 - [`ui-v063-settings-720x480.png`](ui-v063-settings-720x480.png)：0.6.3 种子缓存设置页，逻辑尺寸 `720 × 480`。
+- [`ui-v064-fullscreen-reason-bottom.png`](ui-v064-fullscreen-reason-bottom.png)：0.6.4 全屏类宽屏布局中，Hard seed 3 第 55 步滚动到推理末尾。
 - Implementation pixels: `2880 × 2048`.
 - Logical viewport: `1440 × 1024` at device pixel ratio `2.0`.
 - `1120 × 760` 窄窗口的 0.6.2 长推理首屏与末尾证据已进入公开仓库；其他中间过程仍保存在本地日期归档。
@@ -97,6 +98,14 @@ The current Hard runtime capture now shows the same intended content class as th
 - The cache card exposes purpose, enabled state, entry count, storage size and selectable path; deletion uses a red outlined action, explicit confirmation and inline success/error feedback.
 - Cache hits change only the generation source label to “本地缓存”; board rendering, manual states, long reasoning layout and permanent row clues remain unchanged.
 
+### Pass 8 (`0.6.4`)
+
+- A real maximized-window screenshot showed that the scroll bar could reach its maximum while the final reasoning line remained partially clipped. The footer and text widget did not geometrically overlap; the missing protection was inside the text document's own scroll extent.
+- Removed duplicate bottom padding from the `QTextEdit` viewport and stylesheet, then added a 28 px bottom margin to the document root frame whenever reasoning text changes.
+- The root-frame margin increases the true scrollable document height without appending blank characters, so copying or testing `toPlainText()` still returns the exact original explanation.
+- Replayed Hard seed `00000003` through 54 applied moves and scrolled step 55 to the bottom in a full-screen-class wide layout. The final sentence is fully visible with clear space above the fixed action bar.
+- Source and packaged regressions now inspect the end cursor rectangle directly and require at least 16 px of visible clearance, rather than only comparing the outer widget geometries.
+
 ## Implementation checklist
 
 - [x] Selected direction 2 reproduced as a functional two-column desktop UI.
@@ -107,6 +116,7 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Easy seed 1 dense-board capture passed visual inspection.
 - [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
 - [x] Fifty-three automated core, cache, bridge, solver and Qt workflow tests pass.
+- [x] Full-screen long-reason bottom capture and end-cursor visibility check pass.
 - [x] No actionable P0/P1/P2 visual findings remain.
 
 final result: passed

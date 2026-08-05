@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 
 
 SCREENSHOT_IMPORT_ENABLED = False
+STEP_REASON_BOTTOM_SAFE_MARGIN = 28.0
 
 
 class SeedGenerationThread(QThread):
@@ -363,11 +364,11 @@ class MainWindow(QMainWindow):
         self.step_reason.setMinimumHeight(300)
         self.step_reason.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.step_reason.setFrameShape(QFrame.Shape.NoFrame)
-        self.step_reason.setViewportMargins(0, 0, 0, 6)
+        self.step_reason.setViewportMargins(0, 0, 0, 0)
         self.step_reason.document().setDocumentMargin(2)
         self.step_reason.setStyleSheet(
             f"QTextEdit {{ font-size: 13px; color: {COLORS['muted']}; background: {COLORS['panel']}; "
-            "border: none; padding: 0 2px 6px 0; }}"
+            "border: none; padding: 0 2px 0 0; }}"
         )
         layout.addWidget(self.step_reason, 1)
 
@@ -635,15 +636,23 @@ class MainWindow(QMainWindow):
         if move is None:
             self.step_title.setText("下一步")
             self.step_coord.setText("等待计算")
-            self.step_reason.setPlainText("手动同步到卡住的位置后，获取一个必然成立的步骤。")
+            self._set_step_reason("手动同步到卡住的位置后，获取一个必然成立的步骤。")
             self.apply_button.setEnabled(False)
             return
         action = "标记蓝色" if move.action is MoveAction.MARK_BLUE else "标记排除"
         self.step_title.setText(action)
         self.step_coord.setText(str(move.coord))
-        self.step_reason.setPlainText(move.reason)
-        self.step_reason.verticalScrollBar().setValue(0)
+        self._set_step_reason(move.reason)
         self.apply_button.setEnabled(True)
+
+    def _set_step_reason(self, text: str) -> None:
+        self.step_reason.setPlainText(text)
+        document = self.step_reason.document()
+        root_frame = document.rootFrame()
+        frame_format = root_frame.frameFormat()
+        frame_format.setBottomMargin(STEP_REASON_BOTTOM_SAFE_MARGIN)
+        root_frame.setFrameFormat(frame_format)
+        self.step_reason.verticalScrollBar().setValue(0)
 
     def _update_counts(self) -> None:
         board = self.session.board

@@ -6,10 +6,11 @@ import traceback
 from pathlib import Path
 
 from PySide6.QtCore import QSize
+from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import QApplication
 
-from .app import MainWindow, SCREENSHOT_IMPORT_ENABLED
-from .models import CellVisualType, MoveAction
+from .app import MainWindow, SCREENSHOT_IMPORT_ENABLED, STEP_REASON_BOTTOM_SAFE_MARGIN
+from .models import CellVisualType, MoveAction, SuggestedMove
 from .original_bridge import build_default_seed_registry
 from .seed_workflow import Difficulty, SeedRequest
 from .settings_dialog import SettingsDialog
@@ -49,6 +50,35 @@ def _verify_first_move(puzzle, window: MainWindow) -> None:  # type: ignore[no-u
         )
 
 
+def _verify_reason_bottom_safe_area(window: MainWindow, app: QApplication) -> None:
+    reason = "推理过程：\n" + "\n".join(
+        f"{index}. 这是第 {index} 条可核查条件与计算说明。" for index in range(1, 81)
+    )
+    window._update_step_card(
+        SuggestedMove(
+            coord=(0, 0),
+            action=MoveAction.MARK_BLUE,
+            reason=reason,
+            source="成品显示验证",
+        )
+    )
+    app.processEvents()
+    scroll_bar = window.step_reason.verticalScrollBar()
+    scroll_bar.setValue(scroll_bar.maximum())
+    app.processEvents()
+    cursor = QTextCursor(window.step_reason.document())
+    cursor.movePosition(QTextCursor.MoveOperation.End)
+    end_rect = window.step_reason.cursorRect(cursor)
+    visible_bottom = window.step_reason.viewport().rect().bottom()
+    if end_rect.bottom() > visible_bottom - 16:
+        raise RuntimeError("0.6.4 打包界面的推理末行仍被底部操作栏截断。")
+    if (
+        window.step_reason.document().rootFrame().frameFormat().bottomMargin()
+        < STEP_REASON_BOTTOM_SAFE_MARGIN
+    ):
+        raise RuntimeError("0.6.4 打包界面缺少推理正文末尾安全区。")
+
+
 def run_package_smoke_test() -> int:
     """Create the real UI and exercise both packaged generators, then exit."""
 
@@ -86,6 +116,7 @@ def run_package_smoke_test() -> int:
             raise RuntimeError("打包界面的推理原因区域没有获得预期高度。")
         if window.step_reason.geometry().bottom() >= window.step_action_bar.geometry().top():
             raise RuntimeError("打包界面的推理正文进入了底部按钮区域。")
+        _verify_reason_bottom_safe_area(window, app)
         if any(button.size() != QSize(60, 56) for button in window.state_buttons.values()):
             raise RuntimeError("打包界面的手动标记图例没有缩小。")
         row_items = window.stage.board_view.row_clue_items
@@ -99,12 +130,12 @@ def run_package_smoke_test() -> int:
             not window.stage.settings_button.isEnabled()
             or not window.stage.settings_button.accessibleName()
         ):
-            raise RuntimeError("0.6.3 打包界面缺少可访问的设置入口。")
+            raise RuntimeError("打包界面缺少可访问的设置入口。")
         settings = SettingsDialog(registry.cache, window)
         if registry.cache is None or settings.cache_path_value.text() != str(
             registry.cache.directory
         ):
-            raise RuntimeError("0.6.3 设置页没有显示实际种子缓存位置。")
+            raise RuntimeError("设置页没有显示实际种子缓存位置。")
         settings.close()
 
         for difficulty in (Difficulty.EASY, Difficulty.HARD):
@@ -119,7 +150,7 @@ def run_package_smoke_test() -> int:
             _write_progress(f"{difficulty.value}-cache-hit-ok")
 
         if registry.cache is None or registry.cache.stats().entry_count < 2:
-            raise RuntimeError("0.6.3 成品没有保存 Easy/Hard 种子结果缓存。")
+            raise RuntimeError("成品没有保存 Easy/Hard 种子结果缓存。")
 
         _write_progress("success")
         print("[OK] PACKAGE_SMOKE_TEST UI + settings + Easy/Hard seed 1 cache")

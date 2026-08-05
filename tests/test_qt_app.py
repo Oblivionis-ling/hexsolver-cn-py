@@ -9,9 +9,10 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtGui import QTextCursor  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
-from hexsolver_cn.app import MainWindow  # noqa: E402
+from hexsolver_cn.app import MainWindow, STEP_REASON_BOTTOM_SAFE_MARGIN  # noqa: E402
 from hexsolver_cn.models import CellVisualType, MoveAction, SuggestedMove  # noqa: E402
 from hexsolver_cn.original_bridge import (  # noqa: E402
     OriginalRuntimeHardBackend,
@@ -120,6 +121,15 @@ class QtAppWorkflowTests(unittest.TestCase):
         scroll_bar = self.window.step_reason.verticalScrollBar()
         scroll_bar.setValue(scroll_bar.maximum())
         self.assertEqual(scroll_bar.maximum(), scroll_bar.value())
+        end_cursor = QTextCursor(self.window.step_reason.document())
+        end_cursor.movePosition(QTextCursor.MoveOperation.End)
+        end_rect = self.window.step_reason.cursorRect(end_cursor)
+        visible_bottom = self.window.step_reason.viewport().rect().bottom()
+        self.assertLessEqual(end_rect.bottom(), visible_bottom - 16)
+        self.assertGreaterEqual(
+            self.window.step_reason.document().rootFrame().frameFormat().bottomMargin(),
+            STEP_REASON_BOTTOM_SAFE_MARGIN,
+        )
 
     def test_screenshot_import_is_disabled_in_ui_and_guarded_in_handler(self) -> None:
         board_before = self.window.session.board
