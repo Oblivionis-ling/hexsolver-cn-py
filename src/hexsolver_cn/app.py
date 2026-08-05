@@ -28,6 +28,7 @@ from .board_view import HexBoardView
 from .demo_board import build_demo_board
 from .models import Board, CellVisualType, Coord, MoveAction, SuggestedMove
 from .original_bridge import build_default_seed_registry
+from .preferences import AppPreferences
 from .seed_workflow import Difficulty, SeedGeneratorRegistry, SeedRequest
 from .settings_dialog import SettingsDialog
 from .session import BoardStateError, InteractivePuzzleSession
@@ -177,7 +178,11 @@ class BoardStage(QWidget):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, seed_generators: SeedGeneratorRegistry | None = None) -> None:
+    def __init__(
+        self,
+        seed_generators: SeedGeneratorRegistry | None = None,
+        preferences: AppPreferences | None = None,
+    ) -> None:
         super().__init__()
         self.setWindowTitle("HexInfinite 种子求解器")
         self.setMinimumSize(1120, 760)
@@ -186,6 +191,7 @@ class MainWindow(QMainWindow):
 
         self.solver = HexReasoningSolver()
         self.seed_generators = seed_generators or build_default_seed_registry()
+        self.preferences = preferences or AppPreferences()
         self.session = InteractivePuzzleSession(build_demo_board(), self.solver)
         self.current_move: Optional[SuggestedMove] = None
         self.current_seed: Optional[SeedRequest] = None
@@ -221,6 +227,7 @@ class MainWindow(QMainWindow):
         self.stage.import_button.clicked.connect(self.import_screenshot)
         self.stage.settings_button.clicked.connect(self.open_settings)
 
+        self._apply_mouse_control_preference()
         self._load_board(self.session.board, mode_text="界面演示盘 · 非种子生成结果")
 
     def _build_sidebar(self) -> QWidget:
@@ -308,12 +315,12 @@ class MainWindow(QMainWindow):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.addWidget(title)
         header.addStretch(1)
-        help_button = QPushButton()
-        help_button.setObjectName("GhostButton")
-        help_button.setIcon(qta.icon("fa5s.question-circle", color=COLORS["faint"]))
-        help_button.setToolTip("选择状态后，点击右侧棋盘同步游戏进度")
-        help_button.setFixedSize(28, 28)
-        header.addWidget(help_button)
+        self.manual_help_button = QPushButton()
+        self.manual_help_button.setObjectName("GhostButton")
+        self.manual_help_button.setIcon(qta.icon("fa5s.question-circle", color=COLORS["faint"]))
+        self.manual_help_button.setToolTip("选择状态后，左键点击右侧棋盘同步游戏进度")
+        self.manual_help_button.setFixedSize(28, 28)
+        header.addWidget(self.manual_help_button)
         layout.addLayout(header)
 
         states = QHBoxLayout()
@@ -438,6 +445,22 @@ class MainWindow(QMainWindow):
     def _select_state(self, state: CellVisualType) -> None:
         self.selected_state = state
 
+    def _apply_mouse_control_preference(self) -> None:
+        enabled = self.preferences.original_mouse_controls_enabled
+        for button in self.state_buttons.values():
+            button.setEnabled(not enabled)
+            button.setToolTip(
+                "原版鼠标操作已开启：左键排除，右键蓝色"
+                if enabled
+                else f"点击棋盘后设为{button.label}"
+            )
+        if enabled:
+            help_text = "原版鼠标操作已开启：左键排除，右键蓝色；再次同键点击恢复未知"
+        else:
+            help_text = "选择状态后，左键点击右侧棋盘同步游戏进度"
+        self.manual_help_button.setToolTip(help_text)
+        self.manual_help_button.setAccessibleDescription(help_text)
+
     def _load_board(self, board: Board, *, mode_text: str, verified: bool = False) -> None:
         self.stage.board_view.set_board(board)
         self.stage.set_mode(mode_text, verified=verified)
@@ -445,10 +468,28 @@ class MainWindow(QMainWindow):
         self._update_step_card(None)
         self._update_counts()
 
-    def _on_cell_activated(self, coord: Coord) -> None:
+    def _on_cell_activated(
+        self,
+        coord: Coord,
+        button: Qt.MouseButton = Qt.MouseButton.LeftButton,
+    ) -> None:
+        if self.preferences.original_mouse_controls_enabled:
+            if button == Qt.MouseButton.LeftButton:
+                requested_state = CellVisualType.BLACK
+            elif button == Qt.MouseButton.RightButton:
+                requested_state = CellVisualType.BLUE
+            else:
+                return
+            cell = self.session.board.get_cell(coord)
+            if cell is not None and cell.visual_type is requested_state:
+                requested_state = CellVisualType.HIDDEN
+        else:
+            if button != Qt.MouseButton.LeftButton:
+                return
+            requested_state = self.selected_state
         self.stage.board_view.set_selected(coord)
         try:
-            change = self.session.set_cell_state(coord, self.selected_state)
+            change = self.session.set_cell_state(coord, requested_state)
         except BoardStateError as exc:
             self.stage.show_toast(str(exc), danger=True)
             return
@@ -625,8 +666,9 @@ class MainWindow(QMainWindow):
         self._load_board(board, mode_text=f"截图局面 · {Path(path).name}")
 
     def open_settings(self) -> None:
-        dialog = SettingsDialog(self.seed_generators.cache, self)
+        dialog = SettingsDialog(self.seed_generators.cache, self.preferences, self)
         dialog.exec()
+        self._apply_mouse_control_preference()
 
     def copy_seed(self) -> None:
         QApplication.clipboard().setText(self.seed_input.text())

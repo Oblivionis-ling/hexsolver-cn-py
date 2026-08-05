@@ -10,7 +10,7 @@
 - [`../images/hard-seed1.png`](../images/hard-seed1.png)：Hard seed 1，已修正棋盘方向和左右斜向标签。
 - [`../images/easy-seed1.png`](../images/easy-seed1.png)：Easy seed 1，226 格大盘与初始公开信息。
 - [`ui-v065-fullscreen-reason-bottom.png`](ui-v065-fullscreen-reason-bottom.png)：0.6.5 全屏类宽屏布局中，Hard seed 3 第 55 步滚动到推理末尾；默认未知按钮使用黑色选中轮廓。
-- [`ui-v065-settings-720x480.png`](ui-v065-settings-720x480.png)：0.6.5 当前种子缓存设置页，逻辑尺寸 `720 × 480`。
+- [`ui-v065-settings-720x600.png`](ui-v065-settings-720x600.png)：0.6.5 鼠标操作与种子缓存设置页，逻辑尺寸 `720 × 600`；截图中原版式左右键操作已开启。
 - Implementation pixels: `2880 × 2048`.
 - Logical viewport: `1440 × 1024` at device pixel ratio `2.0`.
 - 仓库只保留当前 `0.6.5` 的应用界面截图；旧版布局截图已移除，演进过程保留在下方文字记录和开发历史中。
@@ -30,7 +30,7 @@ No actionable P0, P1, or P2 differences remain for the selected information arch
 - Colors and tokens: unknown, blue, clue, background, border, selected-step, and disabled states map consistently to the source orange/cyan/charcoal/light-gray palette. Text contrast remains usable.
 - Image quality and asset fidelity: the selected design contains no photographic or illustrative raster assets. The board is implemented as interactive native geometry, not a placeholder image. General controls use the QtAwesome icon library; the numbered step marker is product data rendered in the same hexagonal grammar.
 - Copy and content: seed, difficulty, remaining count, manual states, action, coordinate, reason, runtime generation state, and failure recovery are coherent in standalone use. The full Chinese reason remains available through a substantially larger scrollable area at both tested window sizes, while the fixed action bar never overlaps the text viewport.
-- Icons and interaction states: copy, import, undo, reset, zoom, fit, next, apply, selected difficulty, selected manual state, and target-cell states are present and visually distinct.
+- Icons and interaction states: copy, import, undo, reset, zoom, fit, settings, next, apply, selected difficulty, selected manual state, original-mouse toggle, and target-cell states are present and visually distinct.
 - Accessibility: controls use native Qt semantics and keyboard focus behavior, include tooltips, retain high-contrast active states, and use practical click targets. There is no continuous animation that requires reduced-motion handling.
 
 The current Hard runtime capture now shows the same intended content class as the source: a wide irregular generated puzzle and `39` remaining. Easy was separately checked with a much denser 226-cell board; auto-fit keeps the complete puzzle and all line clues visible.
@@ -108,6 +108,8 @@ The current Hard runtime capture now shows the same intended content class as th
 - Kept the existing orange/blue/charcoal fills, `60 × 56` button size, white unchecked outline, shadow, tooltip and accessibility metadata.
 - Captured all three checked states on the real Windows Qt platform; the committed full-screen frame shows the default hidden button with its black outline.
 - Source and packaged regressions click each button, verify exclusive selection and count exact target-color pixels in the rendered button image.
+- Added a settings card with an explicit checked button and status badge for the optional original-game mouse mapping: left-click excludes, right-click marks blue, and repeating the same button restores hidden.
+- The option persists through `QSettings`, defaults off for compatibility, disables the manual-state buttons while active, and is tested with real left/right viewport clicks.
 
 ## Implementation checklist
 
@@ -118,9 +120,10 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Hard seed 1 at `1440 × 1024` and `1120 × 760` passed visual inspection.
 - [x] Easy seed 1 dense-board capture passed visual inspection.
 - [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
-- [x] Fifty-four automated core, cache, bridge, solver and Qt workflow tests pass.
+- [x] Fifty-six automated core, cache, bridge, solver and Qt workflow tests pass.
 - [x] Full-screen long-reason bottom capture and end-cursor visibility check pass.
 - [x] Hidden, blue and excluded buttons render black, orange and blue active outlines respectively.
+- [x] Original-style mouse controls persist, map real left/right clicks, toggle back to unknown, and restore manual tools when disabled.
 - [x] No actionable P0/P1/P2 visual findings remain.
 
 final result: passed

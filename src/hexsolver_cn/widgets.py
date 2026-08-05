@@ -81,6 +81,8 @@ class StateButton(QAbstractButton):
     def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if not self.isEnabled():
+            painter.setOpacity(0.38)
 
         center = QPointF(self.width() / 2.0, 27.0)
         radius = 20.0
