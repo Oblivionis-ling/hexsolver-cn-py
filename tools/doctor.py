@@ -113,9 +113,11 @@ def main() -> None:
             if puzzle.private_answer[move.coord] is not expected:
                 raise SystemExit(f"[FAIL] {difficulty.label} 第一条建议与私有答案不一致。")
             verdict = f"第一步 {move.coord} / {move.action.value} 已核对"
+        generation_source = "本地缓存" if puzzle.cache_hit else "精确后端新生成"
         print(
             f"[OK] {difficulty.label} seed {args.smoke_seed:08d}: "
-            f"{len(puzzle.public_board.cells)} 格，{len(puzzle.public_board.row_clues)} 条行线索；{verdict}"
+            f"{len(puzzle.public_board.cells)} 格，{len(puzzle.public_board.row_clues)} 条行线索；"
+            f"{verdict}；来源：{generation_source}"
         )
         if args.full_replay:
             session = InteractivePuzzleSession(

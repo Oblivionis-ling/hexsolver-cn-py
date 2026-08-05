@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
 from hexsolver_cn.app import MainWindow
+from hexsolver_cn.settings_dialog import SettingsDialog
 from hexsolver_cn.theme import app_stylesheet
 
 
@@ -21,6 +22,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int)
     parser.add_argument("--difficulty", choices=("easy", "hard"), default="hard")
     parser.add_argument("--generation-timeout", type=float, default=180.0)
+    parser.add_argument("--settings", action="store_true")
     args = parser.parse_args()
 
     app = QApplication.instance() or QApplication([])
@@ -57,8 +59,16 @@ def main() -> None:
         scroll_bar.setValue(scroll_bar.maximum())
         app.processEvents()
 
+    target = window
+    settings_dialog = None
+    if args.settings:
+        settings_dialog = SettingsDialog(window.seed_generators.cache, window)
+        settings_dialog.show()
+        app.processEvents()
+        target = settings_dialog
+
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    if not window.grab().save(str(args.output), "PNG"):
+    if not target.grab().save(str(args.output), "PNG"):
         raise SystemExit(f"Could not save screenshot: {args.output}")
     print(args.output.resolve())
 

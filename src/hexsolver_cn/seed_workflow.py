@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Mapping, Protocol
+from typing import TYPE_CHECKING, Dict, Mapping, Protocol
 
 from .models import Board, CellReveal, CellVisualType, Coord
+
+if TYPE_CHECKING:
+    from .seed_cache import SeedResultCache
 
 
 GAME_BUILD_ID = "5455383"
@@ -86,6 +89,8 @@ class GeneratedPuzzle:
     private_reveals: Mapping[Coord, CellReveal] = field(default_factory=dict, repr=False)
     backend_id: str = ""
     fidelity: GeneratorFidelity = GeneratorFidelity.SCAFFOLD
+    cache_hit: bool = False
+    cache_saved: bool = False
 
     def verify_public_board_has_no_hidden_answer(self) -> None:
         hidden_coords = {cell.coord for cell in self.public_board.hidden_cells()}
@@ -115,8 +120,13 @@ class SeedGenerationUnavailable(RuntimeError):
 
 
 class SeedGeneratorRegistry:
-    def __init__(self) -> None:
+    def __init__(self, cache: "SeedResultCache | None" = None) -> None:
         self._backends: Dict[Difficulty, SeedGeneratorBackend] = {}
+        self._cache = cache
+
+    @property
+    def cache(self) -> "SeedResultCache | None":
+        return self._cache
 
     def register(self, backend: SeedGeneratorBackend) -> None:
         self._backends[backend.difficulty] = backend
@@ -137,8 +147,22 @@ class SeedGeneratorRegistry:
                 f"后端 {backend.backend_id} 的状态是“{backend.fidelity.label}”，"
                 "尚不能声称会生成与原游戏完全相同的地图。"
             )
+        if self._cache is not None and backend.fidelity.is_exact:
+            cached = self._cache.get(
+                request,
+                backend_id=backend.backend_id,
+                fidelity=backend.fidelity,
+            )
+            if cached is not None:
+                return cached
         puzzle = backend.generate(request)
         if puzzle.request != request:
             raise ValueError("生成器返回的种子请求与输入不一致。")
+        if puzzle.backend_id != backend.backend_id or puzzle.fidelity is not backend.fidelity:
+            raise ValueError("生成器返回的后端身份或精确性状态与已注册后端不一致。")
         puzzle.verify_public_board_has_no_hidden_answer()
+        puzzle.cache_hit = False
+        puzzle.cache_saved = False
+        if self._cache is not None and backend.fidelity.is_exact:
+            puzzle.cache_saved = self._cache.put(puzzle)
         return puzzle

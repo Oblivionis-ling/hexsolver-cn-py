@@ -12,6 +12,7 @@ from .app import MainWindow, SCREENSHOT_IMPORT_ENABLED
 from .models import CellVisualType, MoveAction
 from .original_bridge import build_default_seed_registry
 from .seed_workflow import Difficulty, SeedRequest
+from .settings_dialog import SettingsDialog
 from .theme import app_stylesheet
 
 
@@ -80,20 +81,31 @@ def run_package_smoke_test() -> int:
             hasattr(window, name)
             for name in ("history", "history_list", "remaining_value", "error_value")
         ):
-            raise RuntimeError("0.6.2 打包界面仍然包含已移除的次要面板。")
+            raise RuntimeError("打包界面仍然包含已移除的次要面板。")
         if window.step_reason.height() < 560:
-            raise RuntimeError("0.6.2 打包界面的推理原因区域没有获得预期高度。")
+            raise RuntimeError("打包界面的推理原因区域没有获得预期高度。")
         if window.step_reason.geometry().bottom() >= window.step_action_bar.geometry().top():
-            raise RuntimeError("0.6.2 打包界面的推理正文进入了底部按钮区域。")
+            raise RuntimeError("打包界面的推理正文进入了底部按钮区域。")
         if any(button.size() != QSize(60, 56) for button in window.state_buttons.values()):
-            raise RuntimeError("0.6.2 打包界面的手动标记图例没有缩小。")
+            raise RuntimeError("打包界面的手动标记图例没有缩小。")
         row_items = window.stage.board_view.row_clue_items
         if len(row_items) != len(window.session.board.row_clues) or not all(
             item.isVisible() and item.zValue() > 4 for item in row_items
         ):
-            raise RuntimeError("0.6.2 打包界面没有保持所有行线索可见。")
+            raise RuntimeError("打包界面没有保持所有行线索可见。")
         if SCREENSHOT_IMPORT_ENABLED or window.stage.import_button.isEnabled():
             raise RuntimeError("打包版意外启用了尚未开放的截图入口。")
+        if (
+            not window.stage.settings_button.isEnabled()
+            or not window.stage.settings_button.accessibleName()
+        ):
+            raise RuntimeError("0.6.3 打包界面缺少可访问的设置入口。")
+        settings = SettingsDialog(registry.cache, window)
+        if registry.cache is None or settings.cache_path_value.text() != str(
+            registry.cache.directory
+        ):
+            raise RuntimeError("0.6.3 设置页没有显示实际种子缓存位置。")
+        settings.close()
 
         for difficulty in (Difficulty.EASY, Difficulty.HARD):
             _write_progress(f"{difficulty.value}-generate-start")
@@ -101,9 +113,16 @@ def run_package_smoke_test() -> int:
             _write_progress(f"{difficulty.value}-generate-ok")
             _verify_first_move(puzzle, window)
             _write_progress(f"{difficulty.value}-first-move-ok")
+            cached = registry.generate(SeedRequest(seed=1, difficulty=difficulty))
+            if not cached.cache_hit:
+                raise RuntimeError(f"{difficulty.label} seed 1 第二次生成没有命中本地缓存。")
+            _write_progress(f"{difficulty.value}-cache-hit-ok")
+
+        if registry.cache is None or registry.cache.stats().entry_count < 2:
+            raise RuntimeError("0.6.3 成品没有保存 Easy/Hard 种子结果缓存。")
 
         _write_progress("success")
-        print("[OK] PACKAGE_SMOKE_TEST UI + Easy/Hard seed 1")
+        print("[OK] PACKAGE_SMOKE_TEST UI + settings + Easy/Hard seed 1 cache")
         return 0
     except Exception:
         _write_progress("failure")

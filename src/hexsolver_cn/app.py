@@ -29,6 +29,7 @@ from .demo_board import build_demo_board
 from .models import Board, CellVisualType, Coord, MoveAction, SuggestedMove
 from .original_bridge import build_default_seed_registry
 from .seed_workflow import Difficulty, SeedGeneratorRegistry, SeedRequest
+from .settings_dialog import SettingsDialog
 from .session import BoardStateError, InteractivePuzzleSession
 from .solver import HexReasoningSolver, SolverError
 from .theme import COLORS, app_stylesheet
@@ -104,6 +105,7 @@ class BoardStage(QWidget):
         self.zoom_out_button = self._tool_button("fa5s.search-minus", "缩小")
         self.zoom_in_button = self._tool_button("fa5s.search-plus", "放大")
         self.fit_button = self._tool_button("fa5s.expand", "适合窗口")
+        self.settings_button = self._tool_button("fa5s.cog", "设置")
         for button in (
             self.import_button,
             self.undo_button,
@@ -111,6 +113,7 @@ class BoardStage(QWidget):
             self.zoom_out_button,
             self.zoom_in_button,
             self.fit_button,
+            self.settings_button,
         ):
             tools.addWidget(button)
         self.tool_panel.adjustSize()
@@ -127,6 +130,7 @@ class BoardStage(QWidget):
         button.setIconSize(QSize(17, 17))
         button.setFixedSize(36, 34)
         button.setToolTip(tooltip)
+        button.setAccessibleName(tooltip)
         return button
 
     def set_mode(self, text: str, *, verified: bool = False) -> None:
@@ -214,6 +218,7 @@ class MainWindow(QMainWindow):
         self.stage.zoom_out_button.clicked.connect(self.stage.board_view.zoom_out)
         self.stage.fit_button.clicked.connect(self.stage.board_view.fit_board)
         self.stage.import_button.clicked.connect(self.import_screenshot)
+        self.stage.settings_button.clicked.connect(self.open_settings)
 
         self._load_board(self.session.board, mode_text="界面演示盘 · 非种子生成结果")
 
@@ -545,11 +550,21 @@ class MainWindow(QMainWindow):
         )
         self._load_board(
             self.session.board,
-            mode_text=f"种子 {request.seed:08d} · {request.difficulty.label} · 离线精确生成",
+            mode_text=(
+                f"种子 {request.seed:08d} · {request.difficulty.label} · "
+                f"{'本地缓存' if puzzle.cache_hit else '离线精确生成'}"
+            ),
             verified=True,
         )
+        if puzzle.cache_hit:
+            source = "已从本地缓存加载"
+        elif puzzle.cache_saved:
+            source = "生成完成并已缓存"
+        else:
+            source = "生成完成"
         self.stage.show_toast(
-            f"生成完成：{len(self.session.board.cells)} 个格子，{len(self.session.board.row_clues)} 条行线索"
+            f"{source}：{len(self.session.board.cells)} 个格子，"
+            f"{len(self.session.board.row_clues)} 条行线索"
         )
 
     def _generation_failed(self, message: str) -> None:
@@ -571,6 +586,7 @@ class MainWindow(QMainWindow):
         self.hard_button.setEnabled(not busy)
         self.copy_seed_button.setEnabled(not busy)
         self.generate_button.setEnabled(not busy)
+        self.stage.settings_button.setEnabled(not busy)
         self.generate_button.setText("离线生成中…" if busy else "生成地图")
         self.generate_button.setIcon(
             qta.icon("fa5s.circle-notch" if busy else "fa5s.play", color=COLORS["white"])
@@ -606,6 +622,10 @@ class MainWindow(QMainWindow):
         self.session = InteractivePuzzleSession(board, self.solver)
         self.current_seed = None
         self._load_board(board, mode_text=f"截图局面 · {Path(path).name}")
+
+    def open_settings(self) -> None:
+        dialog = SettingsDialog(self.seed_generators.cache, self)
+        dialog.exec()
 
     def copy_seed(self) -> None:
         QApplication.clipboard().setText(self.seed_input.text())

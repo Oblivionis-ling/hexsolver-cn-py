@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from hexsolver_cn.app import MainWindow  # noqa: E402
 from hexsolver_cn.models import CellVisualType, MoveAction, SuggestedMove  # noqa: E402
 from hexsolver_cn.original_bridge import (  # noqa: E402
     OriginalRuntimeHardBackend,
 )
+from hexsolver_cn.seed_cache import SeedResultCache  # noqa: E402
 from hexsolver_cn.seed_workflow import Difficulty, SeedGeneratorRegistry  # noqa: E402
+from hexsolver_cn.settings_dialog import SettingsDialog  # noqa: E402
 
 
 class FixtureRunner:
@@ -128,6 +132,43 @@ class QtAppWorkflowTests(unittest.TestCase):
         file_picker.assert_not_called()
         self.assertIs(self.window.session.board, board_before)
         self.assertIn("截图识别功能暂时关闭", self.window.stage.toast.text())
+
+    def test_settings_entry_is_accessible_and_cache_page_can_clear_results(self) -> None:
+        self.assertTrue(self.window.stage.settings_button.isEnabled())
+        self.assertEqual("设置", self.window.stage.settings_button.toolTip())
+        self.assertEqual("设置", self.window.stage.settings_button.accessibleName())
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            cache = SeedResultCache(temporary_directory)
+            cache_file = Path(temporary_directory) / "seed-fixture.json"
+            cache_file.write_text("{}", encoding="utf-8")
+            dialog = SettingsDialog(cache, self.window)
+            dialog.show()
+            self.app.processEvents()
+
+            self.assertEqual("1 项", dialog.cache_count_value.text())
+            self.assertNotEqual("0 B", dialog.cache_size_value.text())
+            self.assertEqual(
+                str(Path(temporary_directory).resolve()),
+                dialog.cache_path_value.text(),
+            )
+            self.assertTrue(dialog.clear_cache_button.isEnabled())
+            self.assertEqual(
+                "删除全部种子结果缓存",
+                dialog.clear_cache_button.accessibleName(),
+            )
+
+            with patch(
+                "hexsolver_cn.settings_dialog.QMessageBox.question",
+                return_value=QMessageBox.StandardButton.Yes,
+            ):
+                dialog.confirm_clear_cache()
+
+            self.assertEqual("0 项", dialog.cache_count_value.text())
+            self.assertFalse(cache_file.exists())
+            self.assertFalse(dialog.clear_cache_button.isEnabled())
+            self.assertIn("已删除", dialog.feedback_label.text())
+            dialog.close()
 
     def test_manual_mark_and_undo_round_trip(self) -> None:
         coord = next(

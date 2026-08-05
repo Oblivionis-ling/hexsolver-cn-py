@@ -17,7 +17,7 @@ $assetScript = Join-Path $projectRoot "packaging\build_assets.py"
 $assetDir = Join-Path $projectRoot "build\package_assets"
 $workDir = Join-Path $projectRoot "build\pyinstaller"
 $distDir = Join-Path $projectRoot "dist"
-$expectedVersion = "0.6.2"
+$expectedVersion = "0.6.3"
 
 function Write-Step([string]$message) {
     Write-Host "[HexInfinite $expectedVersion] $message" -ForegroundColor Cyan
@@ -104,12 +104,21 @@ if (-not $SkipPackageSmokeTest) {
     Write-Step "Starting the real packaged UI and verifying Easy/Hard seed 1..."
     $previousPlatform = $env:QT_QPA_PLATFORM
     $previousSmokeLog = $env:HEXSOLVER_PACKAGE_SMOKE_LOG
+    $previousCacheDir = $env:HEXSOLVER_CACHE_DIR
     $smokeLog = Join-Path $env:TEMP "HexInfiniteSolver-$version-package-smoke.log"
+    $tempRoot = [IO.Path]::GetFullPath($env:TEMP).TrimEnd('\') + '\'
+    $smokeCacheDir = Join-Path $env:TEMP "HexInfiniteSolver-$version-package-smoke-$([Guid]::NewGuid().ToString('N'))"
+    $resolvedSmokeCacheDir = [IO.Path]::GetFullPath($smokeCacheDir)
+    if (-not $resolvedSmokeCacheDir.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Package smoke cache escaped the system temp directory: $resolvedSmokeCacheDir"
+    }
+    New-Item -ItemType Directory -Path $resolvedSmokeCacheDir | Out-Null
     if (Test-Path -LiteralPath $smokeLog) {
         Remove-Item -LiteralPath $smokeLog -Force
     }
     $env:QT_QPA_PLATFORM = "offscreen"
     $env:HEXSOLVER_PACKAGE_SMOKE_LOG = $smokeLog
+    $env:HEXSOLVER_CACHE_DIR = $resolvedSmokeCacheDir
     try {
         $process = Start-Process -FilePath $artifactPath -ArgumentList "--package-smoke-test" -PassThru -WindowStyle Hidden
         if (-not $process.WaitForExit(180000)) {
@@ -133,6 +142,10 @@ if (-not $SkipPackageSmokeTest) {
     finally {
         $env:QT_QPA_PLATFORM = $previousPlatform
         $env:HEXSOLVER_PACKAGE_SMOKE_LOG = $previousSmokeLog
+        $env:HEXSOLVER_CACHE_DIR = $previousCacheDir
+        if (Test-Path -LiteralPath $resolvedSmokeCacheDir) {
+            Remove-Item -LiteralPath $resolvedSmokeCacheDir -Recurse -Force
+        }
     }
 }
 

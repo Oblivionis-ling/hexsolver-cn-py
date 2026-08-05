@@ -475,9 +475,10 @@ class OriginalRuntimeEasyBackend:
 def build_default_seed_registry():
     from .hard_offline import OfflineHardBackend
     from .managed_easy import HeadlessEasyBackend
+    from .seed_cache import SeedResultCache
     from .seed_workflow import SeedGeneratorRegistry
 
-    registry = SeedGeneratorRegistry()
+    registry = SeedGeneratorRegistry(cache=SeedResultCache())
     registry.register(HeadlessEasyBackend())
     registry.register(OfflineHardBackend())
     return registry

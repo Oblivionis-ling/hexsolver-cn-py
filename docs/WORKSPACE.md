@@ -32,7 +32,7 @@ F:\SteamLibrary\steamapps\common\Hexcells Infinite
 
 - `.conda_env/`：当前一键启动环境，可由 `run.ps1` 重建；
 - `managed_core/bin/`：Easy 托管核心构建产物，可由 `managed_core/build.ps1` 重建；
-- `build/`、`dist/`：0.6.2 PyInstaller 中间目录和单文件成品，可由 `packaging/build_app.ps1` 重建；
+- `build/`、`dist/`：0.6.3 PyInstaller 中间目录和单文件成品，可由 `packaging/build_app.ps1` 重建；
 - `tests/images/`、`tests/labels/`：含原版游戏截图的 OCR 本地数据；
 - `tests/reports/`：临时视觉 QA 输出；
 - `.vscode/`：打开仓库自身时使用的个人编辑器设置。
