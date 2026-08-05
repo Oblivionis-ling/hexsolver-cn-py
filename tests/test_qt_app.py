@@ -9,7 +9,9 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QPointF, QSettings, Qt  # noqa: E402
 from PySide6.QtGui import QColor, QTextCursor  # noqa: E402
+from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from hexsolver_cn.app import MainWindow, STEP_REASON_BOTTOM_SAFE_MARGIN  # noqa: E402
@@ -17,6 +19,7 @@ from hexsolver_cn.models import CellVisualType, MoveAction, SuggestedMove  # noq
 from hexsolver_cn.original_bridge import (  # noqa: E402
     OriginalRuntimeHardBackend,
 )
+from hexsolver_cn.preferences import AppPreferences  # noqa: E402
 from hexsolver_cn.seed_cache import SeedResultCache  # noqa: E402
 from hexsolver_cn.seed_workflow import Difficulty, SeedGeneratorRegistry  # noqa: E402
 from hexsolver_cn.settings_dialog import SettingsDialog  # noqa: E402
@@ -36,10 +39,19 @@ class QtAppWorkflowTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self) -> None:
-        self.window = MainWindow(seed_generators=SeedGeneratorRegistry())
+        self.preferences_directory = tempfile.TemporaryDirectory()
+        self.preferences_path = Path(self.preferences_directory.name) / "settings.ini"
+        self.preferences = AppPreferences(
+            QSettings(str(self.preferences_path), QSettings.Format.IniFormat)
+        )
+        self.window = MainWindow(
+            seed_generators=SeedGeneratorRegistry(),
+            preferences=self.preferences,
+        )
 
     def tearDown(self) -> None:
         self.window.close()
+        self.preferences_directory.cleanup()
 
     def test_demo_board_can_suggest_and_apply_one_forced_move(self) -> None:
         self.window.solve_next_step()
@@ -187,7 +199,7 @@ class QtAppWorkflowTests(unittest.TestCase):
             cache = SeedResultCache(temporary_directory)
             cache_file = Path(temporary_directory) / "seed-fixture.json"
             cache_file.write_text("{}", encoding="utf-8")
-            dialog = SettingsDialog(cache, self.window)
+            dialog = SettingsDialog(cache, self.preferences, self.window)
             dialog.show()
             self.app.processEvents()
 
@@ -214,6 +226,78 @@ class QtAppWorkflowTests(unittest.TestCase):
             self.assertFalse(dialog.clear_cache_button.isEnabled())
             self.assertIn("已删除", dialog.feedback_label.text())
             dialog.close()
+
+    def test_original_mouse_controls_setting_persists_and_updates_state(self) -> None:
+        dialog = SettingsDialog(None, self.preferences, self.window)
+        dialog.show()
+        self.app.processEvents()
+
+        self.assertFalse(self.preferences.original_mouse_controls_enabled)
+        self.assertFalse(dialog.original_mouse_controls_toggle.isChecked())
+        self.assertEqual("已关闭", dialog.mouse_controls_state_label.text())
+
+        dialog.original_mouse_controls_toggle.click()
+        self.app.processEvents()
+
+        self.assertTrue(self.preferences.original_mouse_controls_enabled)
+        self.assertEqual("已开启", dialog.mouse_controls_state_label.text())
+        self.assertIn("已保存", dialog.feedback_label.text())
+        reloaded = AppPreferences(
+            QSettings(str(self.preferences_path), QSettings.Format.IniFormat)
+        )
+        self.assertTrue(reloaded.original_mouse_controls_enabled)
+        dialog.close()
+
+    def test_original_mouse_controls_map_real_left_and_right_clicks(self) -> None:
+        view = self.window.stage.board_view
+        self.window.show()
+        self.app.processEvents()
+        view.fit_board()
+        self.app.processEvents()
+        coords = [cell.coord for cell in self.window.session.board.hidden_cells()][:3]
+
+        def click_cell(coord, button) -> None:  # type: ignore[no-untyped-def]
+            cell = self.window.session.board.get_cell(coord)
+            assert cell is not None
+            position = view.mapFromScene(QPointF(*cell.center))
+            QTest.mouseClick(view.viewport(), button, Qt.KeyboardModifier.NoModifier, position)
+            self.app.processEvents()
+
+        self.window._select_state(CellVisualType.BLACK)
+        click_cell(coords[0], Qt.MouseButton.LeftButton)
+        self.assertIs(
+            self.window.session.board.get_cell(coords[0]).visual_type,
+            CellVisualType.BLACK,
+        )
+        click_cell(coords[1], Qt.MouseButton.RightButton)
+        self.assertIs(
+            self.window.session.board.get_cell(coords[1]).visual_type,
+            CellVisualType.HIDDEN,
+        )
+
+        self.preferences.set_original_mouse_controls_enabled(True)
+        self.window._apply_mouse_control_preference()
+        self.assertTrue(all(not button.isEnabled() for button in self.window.state_buttons.values()))
+        self.assertTrue(
+            all("左键排除，右键蓝色" in button.toolTip() for button in self.window.state_buttons.values())
+        )
+        self.assertIn("左键排除，右键蓝色", self.window.manual_help_button.toolTip())
+
+        click_cell(coords[1], Qt.MouseButton.LeftButton)
+        self.assertIs(
+            self.window.session.board.get_cell(coords[1]).visual_type,
+            CellVisualType.BLACK,
+        )
+        click_cell(coords[2], Qt.MouseButton.RightButton)
+        self.assertIs(
+            self.window.session.board.get_cell(coords[2]).visual_type,
+            CellVisualType.BLUE,
+        )
+        click_cell(coords[2], Qt.MouseButton.RightButton)
+        self.assertIs(
+            self.window.session.board.get_cell(coords[2]).visual_type,
+            CellVisualType.HIDDEN,
+        )
 
     def test_manual_mark_and_undo_round_trip(self) -> None:
         coord = next(
@@ -253,7 +337,7 @@ class QtAppWorkflowTests(unittest.TestCase):
         registry = SeedGeneratorRegistry()
         registry.register(OriginalRuntimeHardBackend(FixtureRunner(text)))
         self.window.close()
-        self.window = MainWindow(seed_generators=registry)
+        self.window = MainWindow(seed_generators=registry, preferences=self.preferences)
         self.window.easy_button.setChecked(False)
         self.window.hard_button.setChecked(True)
         self.window.seed_input.setText("1")

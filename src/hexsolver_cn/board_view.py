@@ -18,7 +18,7 @@ from .theme import COLORS
 
 
 class HexBoardView(QGraphicsView):
-    cell_activated = Signal(object)
+    cell_activated = Signal(object, object)
 
     def __init__(self, parent=None) -> None:  # type: ignore[no-untyped-def]
         super().__init__(parent)
@@ -31,6 +31,7 @@ class HexBoardView(QGraphicsView):
         )
         self.setFrameShape(QGraphicsView.Shape.NoFrame)
         self.setStyleSheet("background: transparent; border: none;")
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.PreventContextMenu)
         # Keep the fitted board and its outer line clues clear of the mode chip,
         # remaining counter, and bottom-right tool rail drawn by BoardStage.
         self.setViewportMargins(16, 64, 132, 18)
@@ -218,14 +219,14 @@ class HexBoardView(QGraphicsView):
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
             event.accept()
             return
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() in (Qt.MouseButton.LeftButton, Qt.MouseButton.RightButton):
             item: Optional[QGraphicsItem] = self.itemAt(event.position().toPoint())
             coord = None
             while item is not None and coord is None:
                 coord = item.data(0)
                 item = item.parentItem()
             if isinstance(coord, tuple) and len(coord) == 2:
-                self.cell_activated.emit(coord)
+                self.cell_activated.emit(coord, event.button())
                 event.accept()
                 return
         super().mousePressEvent(event)

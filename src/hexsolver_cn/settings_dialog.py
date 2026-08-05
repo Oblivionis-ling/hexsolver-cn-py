@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import __version__
+from .preferences import AppPreferences
 from .seed_cache import SeedCacheStats, SeedResultCache
 from .theme import COLORS
 from .widgets import ChamferPanel
@@ -38,15 +39,17 @@ class SettingsDialog(QDialog):
     def __init__(
         self,
         cache: SeedResultCache | None,
+        preferences: AppPreferences | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.cache = cache
+        self.preferences = preferences or AppPreferences()
         self.setObjectName("SettingsDialog")
         self.setWindowTitle("设置 · HexInfinite 种子求解器")
         self.setWindowIcon(qta.icon("fa5s.cog", color=COLORS["orange"]))
         self.setModal(True)
-        self.resize(720, 480)
+        self.resize(720, 600)
         self.setMinimumSize(620, 420)
         self.setStyleSheet(
             f"""
@@ -77,6 +80,18 @@ class SettingsDialog(QDialog):
                 min-width: 96px; font-weight: 700;
             }}
             QPushButton#DialogCloseButton:hover {{ background: {COLORS['blue_hover']}; }}
+            QPushButton#SettingsToggleButton {{
+                color: {COLORS['blue_hover']}; background-color: {COLORS['white']};
+                border: 1px solid {COLORS['blue']}; border-radius: 4px;
+                min-height: 40px; padding: 0 16px; font-weight: 700;
+            }}
+            QPushButton#SettingsToggleButton:hover {{ background-color: {COLORS['blue_soft']}; }}
+            QPushButton#SettingsToggleButton:checked,
+            QPushButton#SettingsToggleButton:checked:hover,
+            QPushButton#SettingsToggleButton:checked:pressed {{
+                color: {COLORS['white']}; background-color: {COLORS['blue']};
+                border-color: {COLORS['blue']};
+            }}
             """
         )
 
@@ -121,6 +136,7 @@ class SettingsDialog(QDialog):
         self.sections_layout = QVBoxLayout(content)
         self.sections_layout.setContentsMargins(0, 0, 6, 0)
         self.sections_layout.setSpacing(14)
+        self.sections_layout.addWidget(self._build_mouse_controls_section())
         self.sections_layout.addWidget(self._build_cache_section())
         self.sections_layout.addStretch(1)
         scroll.setWidget(content)
@@ -139,6 +155,79 @@ class SettingsDialog(QDialog):
         root_layout.addLayout(footer)
 
         self.refresh_cache_stats()
+
+    def _build_mouse_controls_section(self) -> QWidget:
+        panel = ChamferPanel(fill=COLORS["panel"], border=COLORS["border"], chamfer=13)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(12)
+
+        heading = QHBoxLayout()
+        heading.setSpacing(10)
+        icon = QLabel()
+        icon.setPixmap(qta.icon("fa5s.mouse-pointer", color=COLORS["orange"]).pixmap(22, 22))
+        heading.addWidget(icon)
+        title = QLabel("棋盘鼠标操作")
+        title.setObjectName("SettingsSectionTitle")
+        heading.addWidget(title)
+        heading.addStretch(1)
+        self.mouse_controls_state_label = QLabel()
+        heading.addWidget(self.mouse_controls_state_label)
+        layout.addLayout(heading)
+
+        description = QLabel(
+            "开启后沿用原版游戏的快速操作：左键排除，右键标记蓝色；"
+            "对同一状态再次按相同按键会恢复为未知。关闭后继续使用左侧手动标记工具。"
+        )
+        description.setObjectName("SettingsDescription")
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        action_row = QHBoxLayout()
+        action_row.addStretch(1)
+        self.original_mouse_controls_toggle = QPushButton()
+        self.original_mouse_controls_toggle.setObjectName("SettingsToggleButton")
+        self.original_mouse_controls_toggle.setCheckable(True)
+        self.original_mouse_controls_toggle.setAccessibleName("启用原版左右键棋盘操作")
+        self.original_mouse_controls_toggle.setToolTip("左键排除，右键标记蓝色")
+        self.original_mouse_controls_toggle.setChecked(
+            self.preferences.original_mouse_controls_enabled
+        )
+        self.original_mouse_controls_toggle.toggled.connect(
+            self._set_original_mouse_controls_enabled
+        )
+        action_row.addWidget(self.original_mouse_controls_toggle)
+        layout.addLayout(action_row)
+        self._refresh_mouse_controls_state()
+        return panel
+
+    def _set_original_mouse_controls_enabled(self, enabled: bool) -> None:
+        self.preferences.set_original_mouse_controls_enabled(enabled)
+        self._refresh_mouse_controls_state()
+        self.feedback_label.setText("鼠标操作设置已保存。")
+        self.feedback_label.setStyleSheet(f"color: {COLORS['blue_hover']};")
+
+    def _refresh_mouse_controls_state(self) -> None:
+        enabled = self.original_mouse_controls_toggle.isChecked()
+        self.original_mouse_controls_toggle.setText(
+            "原版左右键操作已开启" if enabled else "开启原版左右键操作"
+        )
+        toggle_foreground = COLORS["white"] if enabled else COLORS["blue_hover"]
+        toggle_background = COLORS["blue"] if enabled else COLORS["white"]
+        toggle_hover = COLORS["blue_hover"] if enabled else COLORS["blue_soft"]
+        self.original_mouse_controls_toggle.setStyleSheet(
+            f"QPushButton {{ color: {toggle_foreground}; "
+            f"background-color: {toggle_background}; border: 1px solid {COLORS['blue']}; "
+            "border-radius: 4px; min-height: 40px; padding: 0 16px; font-weight: 700; }} "
+            f"QPushButton:hover {{ background-color: {toggle_hover}; }}"
+        )
+        self.mouse_controls_state_label.setText("已开启" if enabled else "已关闭")
+        foreground = COLORS["blue_hover"] if enabled else COLORS["muted"]
+        background = COLORS["blue_soft"] if enabled else COLORS["panel_alt"]
+        self.mouse_controls_state_label.setStyleSheet(
+            f"color: {foreground}; background: {background}; border-radius: 4px; "
+            "padding: 4px 8px; font-size: 11px; font-weight: 700;"
+        )
 
     def _build_cache_section(self) -> QWidget:
         panel = ChamferPanel(fill=COLORS["panel"], border=COLORS["border"], chamfer=13)

@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QApplication
 
 from hexsolver_cn.app import MainWindow
 from hexsolver_cn.models import CellVisualType
+from hexsolver_cn.preferences import AppPreferences
 from hexsolver_cn.settings_dialog import SettingsDialog
 from hexsolver_cn.theme import app_stylesheet
 
@@ -25,13 +26,17 @@ def main() -> None:
     parser.add_argument("--generation-timeout", type=float, default=180.0)
     parser.add_argument("--settings", action="store_true")
     parser.add_argument("--manual-state", choices=("hidden", "blue", "black"))
+    parser.add_argument("--original-mouse-controls", action="store_true")
     args = parser.parse_args()
 
     app = QApplication.instance() or QApplication([])
     app.setStyle("Fusion")
     app.setStyleSheet(app_stylesheet())
 
-    window = MainWindow()
+    preferences = AppPreferences(persistent=False)
+    if args.original_mouse_controls:
+        preferences.set_original_mouse_controls_enabled(True)
+    window = MainWindow(preferences=preferences)
     window.setFixedSize(args.width, args.height)
     window.show()
     app.processEvents()
@@ -72,7 +77,7 @@ def main() -> None:
     target = window
     settings_dialog = None
     if args.settings:
-        settings_dialog = SettingsDialog(window.seed_generators.cache, window)
+        settings_dialog = SettingsDialog(window.seed_generators.cache, preferences, window)
         settings_dialog.show()
         app.processEvents()
         target = settings_dialog

@@ -5,13 +5,14 @@ import sys
 import traceback
 from pathlib import Path
 
-from PySide6.QtCore import QSize
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QColor, QTextCursor
 from PySide6.QtWidgets import QApplication
 
 from .app import MainWindow, SCREENSHOT_IMPORT_ENABLED, STEP_REASON_BOTTOM_SAFE_MARGIN
 from .models import CellVisualType, MoveAction, SuggestedMove
 from .original_bridge import build_default_seed_registry
+from .preferences import AppPreferences
 from .seed_workflow import Difficulty, SeedRequest
 from .settings_dialog import SettingsDialog
 from .theme import app_stylesheet
@@ -120,7 +121,8 @@ def run_package_smoke_test() -> int:
         _write_progress("resources-ok")
         registry = build_default_seed_registry()
         _write_progress("registry-ok")
-        window = MainWindow(seed_generators=registry)
+        preferences = AppPreferences(persistent=False)
+        window = MainWindow(seed_generators=registry, preferences=preferences)
         _write_progress("window-created")
         window.show()
         app.processEvents()
@@ -157,11 +159,35 @@ def run_package_smoke_test() -> int:
             or not window.stage.settings_button.accessibleName()
         ):
             raise RuntimeError("打包界面缺少可访问的设置入口。")
-        settings = SettingsDialog(registry.cache, window)
+        settings = SettingsDialog(registry.cache, preferences, window)
         if registry.cache is None or settings.cache_path_value.text() != str(
             registry.cache.directory
         ):
             raise RuntimeError("设置页没有显示实际种子缓存位置。")
+        if settings.original_mouse_controls_toggle.isChecked():
+            raise RuntimeError("原版鼠标操作没有保持兼容性的默认关闭状态。")
+        settings.original_mouse_controls_toggle.click()
+        app.processEvents()
+        window._apply_mouse_control_preference()
+        if not preferences.original_mouse_controls_enabled or any(
+            button.isEnabled() for button in window.state_buttons.values()
+        ):
+            raise RuntimeError("设置页没有启用原版左右键棋盘操作。")
+        mouse_coords = [cell.coord for cell in window.session.board.hidden_cells()][:2]
+        window._on_cell_activated(mouse_coords[0], Qt.MouseButton.LeftButton)
+        window._on_cell_activated(mouse_coords[1], Qt.MouseButton.RightButton)
+        if (
+            window.session.board.get_cell(mouse_coords[0]).visual_type is not CellVisualType.BLACK
+            or window.session.board.get_cell(mouse_coords[1]).visual_type is not CellVisualType.BLUE
+        ):
+            raise RuntimeError("原版鼠标操作没有正确映射左键排除和右键蓝色。")
+        window._on_cell_activated(mouse_coords[1], Qt.MouseButton.RightButton)
+        if window.session.board.get_cell(mouse_coords[1]).visual_type is not CellVisualType.HIDDEN:
+            raise RuntimeError("原版鼠标操作无法通过同键再次点击恢复未知。")
+        settings.original_mouse_controls_toggle.click()
+        window._apply_mouse_control_preference()
+        if not all(button.isEnabled() for button in window.state_buttons.values()):
+            raise RuntimeError("关闭原版鼠标操作后没有恢复手动工具。")
         settings.close()
 
         for difficulty in (Difficulty.EASY, Difficulty.HARD):
@@ -179,7 +205,7 @@ def run_package_smoke_test() -> int:
             raise RuntimeError("成品没有保存 Easy/Hard 种子结果缓存。")
 
         _write_progress("success")
-        print("[OK] PACKAGE_SMOKE_TEST UI + settings + Easy/Hard seed 1 cache")
+        print("[OK] PACKAGE_SMOKE_TEST UI + mouse settings + Easy/Hard seed 1 cache")
         return 0
     except Exception:
         _write_progress("failure")
