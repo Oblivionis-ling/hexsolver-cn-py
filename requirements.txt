@@ -1,7 +1,8 @@
-customtkinter
 numpy
 onnxruntime
 pillow
 opencv-python-headless
 ortools
+PySide6
+qtawesome
 rapidocr

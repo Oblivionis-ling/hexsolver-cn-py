@@ -1,0 +1,306 @@
+from __future__ import annotations
+
+import math
+from typing import Dict, Optional
+
+from PySide6.QtCore import QPoint, QPointF, QRectF, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPolygonF, QTransform, QWheelEvent
+from PySide6.QtWidgets import (
+    QGraphicsItem,
+    QGraphicsPolygonItem,
+    QGraphicsScene,
+    QGraphicsSimpleTextItem,
+    QGraphicsView,
+)
+
+from .models import Board, CellVisualType, Coord, LineFamily, SuggestedMove
+from .theme import COLORS
+
+
+class HexBoardView(QGraphicsView):
+    cell_activated = Signal(object)
+
+    def __init__(self, parent=None) -> None:  # type: ignore[no-untyped-def]
+        super().__init__(parent)
+        self._scene = QGraphicsScene(self)
+        self.setScene(self._scene)
+        self.setRenderHints(
+            QPainter.RenderHint.Antialiasing
+            | QPainter.RenderHint.TextAntialiasing
+            | QPainter.RenderHint.SmoothPixmapTransform
+        )
+        self.setFrameShape(QGraphicsView.Shape.NoFrame)
+        self.setStyleSheet("background: transparent; border: none;")
+        # Keep the fitted board and its outer line clues clear of the mode chip,
+        # remaining counter, and bottom-right tool rail drawn by BoardStage.
+        self.setViewportMargins(16, 64, 132, 18)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
+
+        self.board: Optional[Board] = None
+        self._radius = 28.0
+        self._cell_items: Dict[Coord, QGraphicsPolygonItem] = {}
+        self._cell_text_items: Dict[Coord, QGraphicsSimpleTextItem] = {}
+        self._row_clue_items: list[QGraphicsSimpleTextItem] = []
+        self._target: Optional[Coord] = None
+        self._selected: Optional[Coord] = None
+        self._pan_origin: Optional[QPoint] = None
+        self._auto_fit = True
+
+    def set_board(self, board: Board) -> None:
+        self.board = board
+        self._target = None
+        self._selected = None
+        self._auto_fit = True
+        self._rebuild_scene()
+        QTimer.singleShot(0, self.fit_board)
+
+    def _rebuild_scene(self) -> None:
+        self._scene.clear()
+        self._cell_items.clear()
+        self._cell_text_items.clear()
+        self._row_clue_items.clear()
+        if self.board is None:
+            return
+
+        self._radius = self._estimate_radius()
+        for cell in self.board.visible_cells():
+            if cell.visual_type is CellVisualType.OUTSIDE:
+                continue
+            cx, cy = cell.center
+            shadow = self._polygon(cx, cy + 4.2, self._radius)
+            shadow_item = self._scene.addPolygon(
+                shadow,
+                QPen(Qt.PenStyle.NoPen),
+                QColor(0, 0, 0, 30),
+            )
+            shadow_item.setZValue(0)
+
+            item = QGraphicsPolygonItem(self._polygon(cx, cy, self._radius))
+            item.setPen(QPen(QColor(COLORS["white"]), 3.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            item.setBrush(QColor(self._cell_color(cell.visual_type)))
+            item.setData(0, cell.coord)
+            item.setZValue(1)
+            self._scene.addItem(item)
+            self._cell_items[cell.coord] = item
+
+            text = QGraphicsSimpleTextItem(cell.clue_text, item)
+            font = QFont("Bahnschrift", max(10, int(self._radius * 0.50)))
+            font.setWeight(QFont.Weight.DemiBold)
+            text.setFont(font)
+            text.setBrush(QColor(COLORS["white"]))
+            text.setData(0, cell.coord)
+            self._cell_text_items[cell.coord] = text
+            self._position_cell_text(cell.coord)
+
+        self._draw_row_clues()
+        self._ensure_row_clues_visible()
+        bounds = self._scene.itemsBoundingRect().adjusted(-68, -62, 68, 62)
+        self._scene.setSceneRect(bounds)
+        self.sync_state()
+
+    def _draw_row_clues(self) -> None:
+        if self.board is None:
+            return
+        rotation = {
+            LineFamily.HORIZONTAL: 0.0,
+            LineFamily.DOWN_RIGHT: 58.0,
+            LineFamily.DOWN_LEFT: -58.0,
+        }
+        for row in self.board.row_clues:
+            if not row.clue_text:
+                continue
+            text = QGraphicsSimpleTextItem(row.clue_text)
+            font = QFont("Bahnschrift", 14)
+            font.setWeight(QFont.Weight.DemiBold)
+            text.setFont(font)
+            text.setBrush(QColor(COLORS["text"]))
+            if not any(self.board.get_cell(coord) for coord in row.coords):
+                continue
+            anchor = row.anchor
+            bounds = text.boundingRect()
+            text.setTransformOriginPoint(bounds.center())
+            text.setRotation(rotation[row.family])
+            text.setPos(anchor[0] - bounds.width() / 2.0, anchor[1] - bounds.height() / 2.0)
+            text.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+            text.setZValue(8)
+            self._scene.addItem(text)
+            self._row_clue_items.append(text)
+
+    def _ensure_row_clues_visible(self) -> None:
+        for item in self._row_clue_items:
+            item.setVisible(True)
+            item.setOpacity(1.0)
+            item.setZValue(8)
+
+    @property
+    def row_clue_items(self) -> tuple[QGraphicsSimpleTextItem, ...]:
+        return tuple(self._row_clue_items)
+
+    def sync_state(self) -> None:
+        if self.board is None:
+            return
+        for coord, item in self._cell_items.items():
+            cell = self.board.get_cell(coord)
+            if cell is None:
+                continue
+            item.setBrush(QColor(self._cell_color(cell.visual_type)))
+            text_item = self._cell_text_items.get(coord)
+            if text_item is not None and text_item.text() != cell.clue_text:
+                text_item.setText(cell.clue_text)
+                self._position_cell_text(coord)
+            if coord == self._target:
+                item.setPen(QPen(QColor(COLORS["blue"]), 5.0))
+                item.setZValue(4)
+            elif coord == self._selected:
+                item.setPen(QPen(QColor(COLORS["orange"]), 4.0))
+                item.setZValue(3)
+            else:
+                item.setPen(QPen(QColor(COLORS["white"]), 3.2))
+                item.setZValue(1)
+        self._ensure_row_clues_visible()
+        self.viewport().update()
+
+    def _position_cell_text(self, coord: Coord) -> None:
+        if self.board is None:
+            return
+        cell = self.board.get_cell(coord)
+        text = self._cell_text_items.get(coord)
+        if cell is None or text is None:
+            return
+        cx, cy = cell.center
+        bounds = text.boundingRect()
+        text.setPos(cx - bounds.width() / 2.0, cy - bounds.height() / 2.0 - 1.0)
+
+    def set_target(self, move: Optional[SuggestedMove]) -> None:
+        self._target = move.coord if move is not None else None
+        self.sync_state()
+        if move is not None and move.coord in self._cell_items:
+            self.centerOn(self._cell_items[move.coord])
+
+    def set_selected(self, coord: Optional[Coord]) -> None:
+        self._selected = coord
+        self.sync_state()
+
+    def fit_board(self) -> None:
+        if self._scene.items():
+            self.resetTransform()
+            self.fitInView(self._scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+            self._auto_fit = True
+
+    def zoom_in(self) -> None:
+        self._auto_fit = False
+        self.scale(1.14, 1.14)
+
+    def zoom_out(self) -> None:
+        self._auto_fit = False
+        self.scale(1.0 / 1.14, 1.0 / 1.14)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().resizeEvent(event)
+        if self._auto_fit:
+            QTimer.singleShot(0, self.fit_board)
+
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        self._auto_fit = False
+        factor = 1.12 if event.angleDelta().y() > 0 else 1.0 / 1.12
+        current = self.transform().m11()
+        if (factor > 1 and current < 3.2) or (factor < 1 and current > 0.22):
+            self.scale(factor, factor)
+        event.accept()
+
+    def mousePressEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        if event.button() == Qt.MouseButton.MiddleButton:
+            self._pan_origin = event.position().toPoint()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            event.accept()
+            return
+        if event.button() == Qt.MouseButton.LeftButton:
+            item: Optional[QGraphicsItem] = self.itemAt(event.position().toPoint())
+            coord = None
+            while item is not None and coord is None:
+                coord = item.data(0)
+                item = item.parentItem()
+            if isinstance(coord, tuple) and len(coord) == 2:
+                self.cell_activated.emit(coord)
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        if self._pan_origin is not None:
+            current = event.position().toPoint()
+            delta = current - self._pan_origin
+            self._pan_origin = current
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
+            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+            self._auto_fit = False
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        if event.button() == Qt.MouseButton.MiddleButton and self._pan_origin is not None:
+            self._pan_origin = None
+            self.unsetCursor()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def drawBackground(self, painter: QPainter, rect: QRectF) -> None:
+        painter.fillRect(rect, QColor(COLORS["background"]))
+        painter.save()
+        painter.setPen(QPen(QColor("#E9EBEA"), 1.1))
+        radius = 68.0
+        step_x = 230.0
+        step_y = 198.0
+        start_x = math.floor(rect.left() / step_x) * step_x
+        start_y = math.floor(rect.top() / step_y) * step_y
+        y = start_y
+        row = 0
+        while y <= rect.bottom() + step_y:
+            x = start_x + (step_x / 2.0 if row % 2 else 0.0)
+            while x <= rect.right() + step_x:
+                painter.drawPolygon(self._polygon(x, y, radius))
+                x += step_x
+            y += step_y
+            row += 1
+        painter.restore()
+
+    def _estimate_radius(self) -> float:
+        if self.board is None:
+            return 28.0
+        spacing = min(
+            value
+            for value in (
+                math.hypot(*self.board.basis_a),
+                math.hypot(*self.board.basis_b),
+            )
+            if value > 0.1
+        )
+        return max(14.0, spacing * 0.55)
+
+    @staticmethod
+    def _polygon(cx: float, cy: float, radius: float) -> QPolygonF:
+        return QPolygonF(
+            [
+                QPointF(
+                    cx + radius * math.cos(math.radians(60 * index)),
+                    cy + radius * math.sin(math.radians(60 * index)),
+                )
+                for index in range(6)
+            ]
+        )
+
+    @staticmethod
+    def _cell_color(state: CellVisualType) -> str:
+        return {
+            CellVisualType.HIDDEN: COLORS["orange"],
+            CellVisualType.BLUE: COLORS["blue"],
+            CellVisualType.BLACK: COLORS["charcoal"],
+            CellVisualType.GREY: "#C9CCCB",
+            CellVisualType.OUTSIDE: COLORS["background"],
+        }[state]

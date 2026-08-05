@@ -1,0 +1,248 @@
+HEXINFINITE_EXPORT	1
+SEED	00000001
+CELL	16	17	Black Hex	Untagged	8	2
+CELL	17	16	Black Hex	Untagged	0	2
+CELL	17	14	Blue Hex	Blue	0	
+CELL	16	13	Blue Hex	Blue	8	
+CELL	15	14	Blue Hex	Blue	8	
+CELL	16	19	Black Hex	Clue Hex (NOT Sequential)	8	-3-
+CELL	17	18	Blue Hex	Blue	0	
+CELL	18	15	Black Hex	Clue Hex (Sequential)	8	{4}
+CELL	18	13	Blue Hex	Blue	0	
+CELL	17	12	Blue Hex	Blue	8	
+CELL	15	12	Blue Hex	Blue	0	
+CELL	14	13	Blue Hex	Blue	0	
+CELL	14	17	Black Hex	Untagged	0	3
+CELL	15	18	Blue Hex	Blue	0	
+CELL	16	21	Blue Hex	Blue	0	
+CELL	17	20	Black Hex	Untagged	8	3
+CELL	18	19	Black Hex	Clue Hex Blank	8	?
+CELL	19	18	Black Hex	Clue Hex (Sequential)	8	{3}
+CELL	19	16	Blue Hex	Blue	0	
+CELL	19	14	Blue Hex	Blue	0	
+CELL	18	11	Black Hex	Untagged	8	3
+CELL	17	10	Blue Hex	Blue	8	
+CELL	16	9	Blue Hex	Blue	8	
+CELL	14	11	Black Hex	Untagged	0	3
+CELL	13	12	Blue Hex	Blue	0	
+CELL	13	16	Black Hex	Untagged	0	1
+CELL	13	18	Blue Hex	Blue	8	
+CELL	14	19	Blue Hex	Blue	0	
+CELL	16	23	Black Hex	Untagged	0	3
+CELL	17	22	Blue Hex	Blue	0	
+CELL	19	20	Black Hex	Untagged	8	3
+CELL	20	19	Blue Hex	Blue	0	
+CELL	20	17	Blue Hex	Blue	0	
+CELL	20	13	Blue Hex	Blue	8	
+CELL	20	11	Blue Hex	Blue	8	
+CELL	18	9	Black Hex	Untagged	0	2
+CELL	17	8	Blue Hex	Blue	0	
+CELL	16	7	Blue Hex	Blue	8	
+CELL	15	8	Black Hex	Untagged	0	3
+CELL	14	9	Black Hex	Clue Hex Blank	0	?
+CELL	13	10	Black Hex	Clue Hex (Sequential)	8	{2}
+CELL	12	11	Blue Hex	Blue	0	
+CELL	12	13	Blue Hex	Blue	8	
+CELL	12	17	Black Hex	Untagged	8	3
+CELL	12	19	Blue Hex	Blue	0	
+CELL	13	20	Blue Hex	Blue	0	
+CELL	15	22	Black Hex	Clue Hex (NOT Sequential)	0	-2-
+CELL	16	25	Blue Hex	Blue	8	
+CELL	18	23	Black Hex	Untagged	8	4
+CELL	19	22	Blue Hex	Blue	0	
+CELL	20	21	Blue Hex	Blue	0	
+CELL	21	18	Blue Hex	Blue	8	
+CELL	21	16	Blue Hex	Blue	8	
+CELL	21	12	Black Hex	Clue Hex Blank	8	?
+CELL	21	10	Blue Hex	Blue	0	
+CELL	20	9	Blue Hex	Blue	0	
+CELL	18	7	Black Hex	Clue Hex (Sequential)	8	{3}
+CELL	17	6	Blue Hex	Blue	0	
+CELL	15	6	Black Hex	Clue Hex (NOT Sequential)	8	-4-
+CELL	14	7	Blue Hex	Blue	0	
+CELL	12	9	Black Hex	Clue Hex (Sequential)	8	{4}
+CELL	11	10	Blue Hex	Blue	0	
+CELL	11	12	Blue Hex	Blue	0	
+CELL	11	16	Black Hex	Untagged	0	2
+CELL	11	18	Blue Hex	Blue	8	
+CELL	12	21	Black Hex	Untagged	8	5
+CELL	13	22	Blue Hex	Blue	8	
+CELL	14	23	Blue Hex	Blue	0	
+CELL	15	24	Black Hex	Untagged	8	2
+CELL	16	27	Black Hex	Clue Hex Blank	8	?
+CELL	17	26	Black Hex	Untagged	8	3
+CELL	18	25	Blue Hex	Blue	0	
+CELL	19	24	Blue Hex	Blue	0	
+CELL	20	23	Blue Hex	Blue	8	
+CELL	21	22	Black Hex	Untagged	8	3
+CELL	22	21	Black Hex	Clue Hex Blank	8	?
+CELL	22	19	Black Hex	Untagged	8	3
+CELL	22	17	Blue Hex	Blue	0	
+CELL	22	15	Blue Hex	Blue	8	
+CELL	22	13	Blue Hex	Blue	8	
+CELL	22	9	Blue Hex	Blue	0	
+CELL	21	8	Blue Hex	Blue	0	
+CELL	19	6	Black Hex	Untagged	0	2
+CELL	18	5	Blue Hex	Blue	0	
+CELL	16	3	Black Hex	Untagged	8	2
+CELL	15	4	Blue Hex	Blue	0	
+CELL	14	5	Blue Hex	Blue	0	
+CELL	12	7	Blue Hex	Blue	0	
+CELL	11	8	Blue Hex	Blue	0	
+CELL	10	11	Black Hex	Untagged	8	3
+CELL	10	13	Blue Hex	Blue	0	
+CELL	10	15	Blue Hex	Blue	0	
+CELL	10	17	Black Hex	Untagged	0	3
+CELL	10	19	Black Hex	Clue Hex Blank	0	?
+CELL	10	21	Black Hex	Clue Hex (Sequential)	8	{3}
+CELL	11	22	Blue Hex	Blue	0	
+CELL	12	23	Blue Hex	Blue	8	
+CELL	13	24	Blue Hex	Blue	0	
+CELL	14	25	Black Hex	Untagged	8	3
+CELL	15	26	Black Hex	Clue Hex Blank	0	?
+CELL	17	28	Black Hex	Untagged	8	1
+CELL	18	27	Blue Hex	Blue	0	
+CELL	19	26	Blue Hex	Blue	8	
+CELL	21	24	Black Hex	Clue Hex (NOT Sequential)	8	-2-
+CELL	22	23	Blue Hex	Blue	0	
+CELL	23	22	Blue Hex	Blue	0	
+CELL	23	18	Blue Hex	Blue	0	
+CELL	23	16	Blue Hex	Blue	8	
+CELL	23	12	Black Hex	Untagged	8	3
+CELL	23	10	Blue Hex	Blue	0	
+CELL	23	8	Blue Hex	Blue	0	
+CELL	22	7	Black Hex	Untagged	8	4
+CELL	21	6	Black Hex	Clue Hex Blank	0	?
+CELL	20	5	Black Hex	Untagged	0	2
+CELL	19	4	Blue Hex	Blue	8	
+CELL	18	3	Blue Hex	Blue	0	
+CELL	17	2	Blue Hex	Blue	8	
+CELL	15	2	Black Hex	Untagged	0	1
+CELL	14	3	Black Hex	Clue Hex Blank	0	?
+CELL	13	4	Black Hex	Untagged	0	3
+CELL	12	5	Blue Hex	Blue	8	
+CELL	11	6	Blue Hex	Blue	8	
+CELL	10	7	Blue Hex	Blue	0	
+CELL	9	8	Black Hex	Untagged	0	2
+CELL	9	10	Black Hex	Clue Hex Blank	0	?
+CELL	9	12	Black Hex	Untagged	8	3
+CELL	9	14	Blue Hex	Blue	0	
+CELL	9	16	Blue Hex	Blue	0	
+CELL	9	20	Black Hex	Untagged	0	2
+CELL	9	22	Blue Hex	Blue	0	
+CELL	10	23	Blue Hex	Blue	0	
+CELL	12	25	Black Hex	Clue Hex Blank	8	?
+CELL	13	26	Blue Hex	Blue	0	
+CELL	15	28	Black Hex	Untagged	8	0
+CELL	19	28	Blue Hex	Blue	8	
+CELL	20	27	Blue Hex	Blue	8	
+CELL	21	26	Black Hex	Untagged	0	1
+CELL	22	25	Black Hex	Clue Hex Blank	0	?
+CELL	23	24	Black Hex	Untagged	8	5
+CELL	24	23	Blue Hex	Blue	0	
+CELL	24	21	Blue Hex	Blue	8	
+CELL	24	19	Blue Hex	Blue	8	
+CELL	24	17	Black Hex	Untagged	0	4
+CELL	24	15	Black Hex	Clue Hex Blank	8	?
+CELL	24	13	Black Hex	Clue Hex (Sequential)	8	{2}
+CELL	24	11	Blue Hex	Blue	0	
+CELL	24	9	Blue Hex	Blue	8	
+CELL	23	6	Black Hex	Clue Hex (NOT Sequential)	8	-3-
+CELL	22	5	Blue Hex	Blue	0	
+CELL	21	4	Blue Hex	Blue	0	
+CELL	19	2	Black Hex	Clue Hex Blank	8	?
+CELL	13	2	Blue Hex	Blue	0	
+CELL	11	4	Black Hex	Clue Hex Blank	8	?
+CELL	10	5	Blue Hex	Blue	8	
+CELL	9	6	Blue Hex	Blue	0	
+CELL	8	9	Black Hex	Untagged	8	2
+CELL	8	11	Blue Hex	Blue	8	
+CELL	8	15	Black Hex	Clue Hex (Sequential)	8	{3}
+CELL	8	17	Blue Hex	Blue	0	
+CELL	8	19	Blue Hex	Blue	0	
+CELL	8	21	Black Hex	Untagged	8	3
+CELL	8	23	Black Hex	Clue Hex Blank	0	?
+CELL	9	24	Black Hex	Clue Hex (NOT Sequential)	8	-4-
+CELL	10	25	Blue Hex	Blue	0	
+CELL	11	26	Blue Hex	Blue	0	
+CELL	12	27	Blue Hex	Blue	0	
+CELL	13	28	Black Hex	Untagged	8	2
+CELL	21	28	Black Hex	Clue Hex Blank	0	?
+CELL	22	27	Black Hex	Clue Hex (Sequential)	0	{2}
+CELL	23	26	Blue Hex	Blue	0	
+CELL	24	25	Blue Hex	Blue	0	
+CELL	25	22	Black Hex	Clue Hex Blank	8	?
+CELL	25	20	Blue Hex	Blue	8	
+CELL	25	18	Blue Hex	Blue	0	
+CELL	25	14	Black Hex	Untagged	8	1
+CELL	25	12	Blue Hex	Blue	0	
+CELL	25	8	Black Hex	Untagged	8	4
+CELL	25	6	Blue Hex	Blue	0	
+CELL	24	5	Blue Hex	Blue	0	
+CELL	23	4	Black Hex	Untagged	0	3
+CELL	22	3	Black Hex	Clue Hex Blank	0	?
+CELL	21	2	Black Hex	Untagged	0	1
+CELL	11	2	Blue Hex	Blue	8	
+CELL	10	3	Blue Hex	Blue	8	
+CELL	9	4	Blue Hex	Blue	0	
+CELL	8	5	Black Hex	Clue Hex (Sequential)	8	{3}
+CELL	7	6	Black Hex	Clue Hex Blank	0	?
+CELL	7	8	Black Hex	Clue Hex (Sequential)	0	{3}
+CELL	7	10	Blue Hex	Blue	8	
+CELL	7	12	Blue Hex	Blue	0	
+CELL	7	16	Black Hex	Untagged	0	3
+CELL	7	18	Blue Hex	Blue	0	
+CELL	7	20	Blue Hex	Blue	0	
+CELL	7	24	Black Hex	Untagged	8	2
+CELL	8	25	Blue Hex	Blue	0	
+CELL	10	27	Black Hex	Untagged	8	4
+CELL	11	28	Blue Hex	Blue	8	
+CELL	23	28	Blue Hex	Blue	0	
+CELL	25	26	Black Hex	Untagged	8	2
+CELL	26	25	Blue Hex	Blue	0	
+CELL	26	21	Blue Hex	Blue	8	
+CELL	26	19	Blue Hex	Blue	8	
+CELL	26	17	Blue Hex	Blue	0	
+CELL	26	15	Black Hex	Untagged	0	1
+CELL	26	13	Black Hex	Clue Hex Blank	0	?
+CELL	26	11	Black Hex	Untagged	8	2
+CELL	26	9	Blue Hex	Blue	0	
+CELL	26	7	Blue Hex	Blue	0	
+CELL	26	5	Blue Hex	Blue	0	
+CELL	25	4	Black Hex	Untagged	0	3
+CELL	24	3	Black Hex	Clue Hex Blank	0	?
+CELL	23	2	Blue Hex	Blue	0	
+CELL	9	2	Black Hex	Clue Hex Blank	0	?
+CELL	8	3	Blue Hex	Blue	0	
+CELL	6	5	Black Hex	Untagged	0	1
+CELL	6	7	Blue Hex	Blue	0	
+CELL	6	9	Blue Hex	Blue	0	
+CELL	6	13	Black Hex	Clue Hex Blank	8	?
+CELL	6	15	Blue Hex	Blue	0	
+CELL	6	19	Black Hex	Untagged	8	3
+CELL	6	21	Blue Hex	Blue	0	
+CELL	6	23	Blue Hex	Blue	8	
+CELL	6	25	Black Hex	Untagged	0	1
+CELL	7	26	Black Hex	Clue Hex Blank	0	?
+CELL	8	27	Black Hex	Clue Hex (NOT Sequential)	8	-2-
+CELL	9	28	Blue Hex	Blue	0	
+COLUMN	6	27	Column Number	Untagged	5
+COLUMN	8	29	Column Number	Untagged	5
+COLUMN	9	30	Column Number	Untagged	6
+COLUMN	13	30	Column Number	Untagged	7
+COLUMN	18	29	Column Number	Untagged	5
+COLUMN	21	30	Column Number	Untagged	5
+COLUMN	23	30	Column Number	Untagged	8
+COLUMN	25	28	Column Number	Untagged	4
+COLUMN	14	27	Column Number Diagonal Right	Untagged	4
+COLUMN	27	26	Column Number Diagonal Left	Untagged	9
+COLUMN	20	25	Column Number Diagonal Left	Untagged	8
+COLUMN	25	24	Column Number Diagonal Left	Untagged	8
+COLUMN	18	21	Column Number Diagonal Left	Untagged	5
+COLUMN	6	17	Column Number Diagonal Right	Untagged	8
+COLUMN	5	16	Column Number Diagonal Right	Column NOT Sequential	-4-
+COLUMN	27	14	Column Number Diagonal Left	Column NOT Sequential	-6-
+COLUMN	6	11	Column Number Diagonal Right	Column NOT Sequential	-4-
+COLUMN	5	10	Column Number Diagonal Right	Untagged	4
+COLUMN	27	10	Column Number Diagonal Left	Untagged	3
+COLUMN	27	8	Column Number Diagonal Left	Column Sequential	{3}
