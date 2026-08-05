@@ -9,19 +9,15 @@
 
 - [`../images/hard-seed1.png`](../images/hard-seed1.png)：Hard seed 1，已修正棋盘方向和左右斜向标签。
 - [`../images/easy-seed1.png`](../images/easy-seed1.png)：Easy seed 1，226 格大盘与初始公开信息。
-- [`../images/ui-overview.png`](../images/ui-overview.png)：最终双栏信息架构与操作状态。
-- [`ui-v062-hard-seed3-1440x1024.png`](ui-v062-hard-seed3-1440x1024.png)：0.6.2 Hard seed 3 第 55 步长全局推理首屏。
-- [`ui-v062-hard-seed3-1120x760.png`](ui-v062-hard-seed3-1120x760.png)：0.6.2 最小窗口长推理首屏。
-- [`ui-v062-hard-seed3-1120x760-bottom.png`](ui-v062-hard-seed3-1120x760-bottom.png)：0.6.2 最小窗口滚动到推理末尾。
-- [`ui-v063-settings-720x480.png`](ui-v063-settings-720x480.png)：0.6.3 种子缓存设置页，逻辑尺寸 `720 × 480`。
 - [`ui-v064-fullscreen-reason-bottom.png`](ui-v064-fullscreen-reason-bottom.png)：0.6.4 全屏类宽屏布局中，Hard seed 3 第 55 步滚动到推理末尾。
+- [`ui-v064-settings-720x480.png`](ui-v064-settings-720x480.png)：0.6.4 当前种子缓存设置页，逻辑尺寸 `720 × 480`。
 - Implementation pixels: `2880 × 2048`.
 - Logical viewport: `1440 × 1024` at device pixel ratio `2.0`.
-- `1120 × 760` 窄窗口的 0.6.2 长推理首屏与末尾证据已进入公开仓库；其他中间过程仍保存在本地日期归档。
+- 仓库只保留当前 `0.6.4` 的应用界面截图；旧版布局截图已移除，演进过程保留在下方文字记录和开发历史中。
 
 **Normalized comparison**
 
-- 最终并排比较图保存在本地日期归档；仓库只保留三张可公开的最终状态图。
+- 旧的并排比较图已经在 `0.6.4` 仓库整理时移除；仓库保留两张生成结果证据和两张当前应用界面截图。
 - The source was resampled to `1440 × 1024`; the implementation was downsampled from `2880 × 2048` to the same `1440 × 1024`. The two normalized frames were placed side by side in one `2880 × 1024` comparison image.
 - State: seed `00000001`, Easy selected, visible next-step target and explanation.
 
@@ -63,7 +59,7 @@ The current Hard runtime capture now shows the same intended content class as th
 
 - Earlier P2: the history trail used generic hex icons without step numbers and the rail was wider than the selected source.
 - Fix: add numbered hex step markers, center the manual-marking header, set the rail to `300` logical pixels, and tighten board-stage padding.
-- Post-fix evidence: [`../images/ui-overview.png`](../images/ui-overview.png).
+- Post-fix evidence was superseded by the current `0.6.4` captures; the obsolete intermediate screenshot is no longer retained.
 
 ## Follow-up polish
 

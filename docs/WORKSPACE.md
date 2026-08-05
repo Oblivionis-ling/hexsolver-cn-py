@@ -6,8 +6,7 @@
 D:\Desktop\HexInfinite\
 ├─ .vscode\                 # 打开整个工作区时使用的本地 Python 配置
 ├─ hexsolver_cn_py\         # 唯一 Git 仓库和可公开源码
-├─ reverse_harness\         # 本地专有差分环境，不进入 Git
-└─ _archive\                # 可恢复的日期归档，不进入 Git
+└─ reverse_harness\         # 本地专有差分环境，不进入 Git
 ```
 
 原版游戏安装在：
@@ -25,14 +24,15 @@ F:\SteamLibrary\steamapps\common\Hexcells Infinite
 - Python 应用、Hard 纯 Python 生成器和 Easy 无 Unity 托管宿主源码；
 - 一键启动、依赖、诊断和测试；
 - `tests/fixtures/` 中两个小型结构化 TSV 回归夹具；
-- `docs/images/` 中三张基础界面证据，以及 `docs/design/` 中 0.6.2 长推理布局证据；
+- `docs/images/` 中两张生成结果证据，以及 `docs/design/` 中两张 0.6.4 当前界面证据；
 - 开发历史、算法、路线、设计验收和研究资料。
 
 以下内容有用但只保留在本地，并由 `.gitignore` 排除：
 
 - `.conda_env/`：当前一键启动环境，可由 `run.ps1` 重建；
 - `managed_core/bin/`：Easy 托管核心构建产物，可由 `managed_core/build.ps1` 重建；
-- `build/`、`dist/`：0.6.4 PyInstaller 中间目录和单文件成品，可由 `packaging/build_app.ps1` 重建；
+- `dist/`：只保留最新 0.6.4 单文件成品与 SHA-256；
+- `build/`：PyInstaller 中间目录，发布验证后删除，需要时可由 `packaging/build_app.ps1` 重建；
 - `tests/images/`、`tests/labels/`：含原版游戏截图的 OCR 本地数据；
 - `tests/reports/`：临时视觉 QA 输出；
 - `.vscode/`：打开仓库自身时使用的个人编辑器设置。
@@ -71,10 +71,19 @@ Easy 托管核心的真实集成校验仍需要合法安装中的 `Assembly-CSha
 - Python `__pycache__` 与其他旧文件一并移入日期归档；它们可由运行测试自动重建，确认无回滚需要后可直接删除。
 - `.conda_env`、OCR 本地数据、托管核心输出和隔离游戏副本保留。
 
+## 2026-08-06 最新版本整理
+
+- 当前源码、版本号、README 和打包脚本统一以 `0.6.4` 为准。
+- `dist/` 删除 0.5.0、0.6.1、0.6.2、0.6.3 成品，只保留 0.6.4 EXE 与 SHA-256。
+- 删除可完全重建的 `build/`、Python 字节码和本地旧测试包装脚本。
+- 删除已被 0.6.4 当前截图替代的旧版 UI 图片；版本演进仍保留在 `DEVELOPMENT_HISTORY.md` 和本文件的文字记录中。
+- 2026-08-05 日期归档经确认均为重复或可重建内容，已移入回收站；`reverse_harness`、OCR 数据和项目环境继续保留。
+- GitHub 仅保留最新正式 Release 和版本标签；完整源码提交历史继续由 `main` 保存。
+
 ## 清理原则
 
 - 原游戏安装和存档永不作为清理目标。
 - 游戏二进制、私有运行时、OCR 截图和本地环境永不上传。
 - Release 只上传单文件 EXE 和 SHA-256；构建过程会检查归档不含 `Assembly-CSharp.dll`。
-- 不确定是否有价值的内容先移动到 `_archive/YYYY-MM-DD-*`，验证稳定后再由人工决定是否彻底删除。
+- 不确定是否有价值的内容先移入工作区外的临时归档，验证稳定后再由人工决定是否彻底删除。
 - 只有缓存、日志和可完全重建的临时文件允许直接删除。

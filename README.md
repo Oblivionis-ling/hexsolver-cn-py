@@ -15,11 +15,9 @@
 
 系统要求：Windows 10/11 x64。Hard 完全离线可用；Easy 仍需要本机合法安装 Steam 版 `Hexcells Infinite`，程序只读其 `Assembly-CSharp.dll` 并校验版本，不会把原游戏 DLL、EXE 或存档打进安装包。由于当前成品未做商业代码签名，Windows 首次下载时可能显示 SmartScreen 提示；请用 Release 同时提供的 SHA-256 文件核对完整性。
 
-![0.6.2 Hard seed 3 长推理界面](docs/design/ui-v062-hard-seed3-1440x1024.png)
-
-![0.6.3 种子缓存设置页](docs/design/ui-v063-settings-720x480.png)
-
 ![0.6.4 全屏窗口推理末尾安全区](docs/design/ui-v064-fullscreen-reason-bottom.png)
+
+![0.6.4 种子缓存设置页](docs/design/ui-v064-settings-720x480.png)
 
 ## 已可用
 
@@ -143,7 +141,7 @@ conda run -n hexsolver-cn python main.py
 执行自动测试：
 
 ```powershell
-.\test.cmd
+.\test.ps1
 ```
 
 构建并验证 0.6.4 单文件成品：
