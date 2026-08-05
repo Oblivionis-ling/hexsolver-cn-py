@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtGui import QTextCursor  # noqa: E402
+from PySide6.QtGui import QColor, QTextCursor  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from hexsolver_cn.app import MainWindow, STEP_REASON_BOTTOM_SAFE_MARGIN  # noqa: E402
@@ -73,6 +73,41 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.window.resize(1120, 760)
         self.app.processEvents()
         self.assertGreaterEqual(self.window.step_reason.height(), 300)
+
+    def test_manual_state_buttons_render_distinct_active_outlines(self) -> None:
+        self.window.show()
+        self.app.processEvents()
+        expected = {
+            CellVisualType.HIDDEN: "#3D3F42",
+            CellVisualType.BLUE: "#FFA814",
+            CellVisualType.BLACK: "#0DA9E5",
+        }
+
+        for state, expected_color in expected.items():
+            button = self.window.state_buttons[state]
+            button.click()
+            self.app.processEvents()
+
+            color = QColor(expected_color)
+            self.assertIs(self.window.selected_state, state)
+            self.assertTrue(button.isChecked())
+            self.assertEqual(color, button.outline_color())
+            self.assertTrue(
+                all(
+                    other.isChecked() is (other_state is state)
+                    for other_state, other in self.window.state_buttons.items()
+                )
+            )
+
+            image = button.grab().toImage()
+            rendered_outline_pixels = sum(
+                image.pixelColor(x, y).rgb() == color.rgb()
+                for x in range(image.width())
+                for y in range(image.height())
+            )
+            self.assertGreater(rendered_outline_pixels, 30)
+
+        self.window.state_buttons[CellVisualType.HIDDEN].click()
 
     def test_all_row_clues_remain_visible_above_board_items(self) -> None:
         view = self.window.stage.board_view

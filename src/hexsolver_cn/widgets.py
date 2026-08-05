@@ -57,6 +57,11 @@ class StateButton(QAbstractButton):
         CellVisualType.BLUE: COLORS["blue"],
         CellVisualType.BLACK: COLORS["charcoal"],
     }
+    ACTIVE_OUTLINE_COLORS = {
+        CellVisualType.HIDDEN: COLORS["charcoal"],
+        CellVisualType.BLUE: COLORS["orange"],
+        CellVisualType.BLACK: COLORS["blue"],
+    }
 
     def __init__(self, state: CellVisualType, label: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -68,6 +73,10 @@ class StateButton(QAbstractButton):
         self.setToolTip(f"点击棋盘后设为{label}")
         self.setAccessibleName(f"手动标记：{label}")
         self.setAccessibleDescription(f"选择后，点击棋盘把格子设为{label}")
+
+    def outline_color(self) -> QColor:
+        color = self.ACTIVE_OUTLINE_COLORS[self.state] if self.isChecked() else COLORS["white"]
+        return QColor(color)
 
     def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         painter = QPainter(self)
@@ -90,7 +99,7 @@ class StateButton(QAbstractButton):
         color = QColor(self.STATE_COLORS[self.state])
         if self.underMouse():
             color = color.lighter(106)
-        painter.setPen(QPen(QColor(COLORS["blue"] if self.isChecked() else COLORS["white"]), 3.0))
+        painter.setPen(QPen(self.outline_color(), 3.0))
         painter.setBrush(color)
         painter.drawPolygon(QPolygonF(points))
 

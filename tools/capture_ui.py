@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
 from hexsolver_cn.app import MainWindow
+from hexsolver_cn.models import CellVisualType
 from hexsolver_cn.settings_dialog import SettingsDialog
 from hexsolver_cn.theme import app_stylesheet
 
@@ -23,6 +24,7 @@ def main() -> None:
     parser.add_argument("--difficulty", choices=("easy", "hard"), default="hard")
     parser.add_argument("--generation-timeout", type=float, default=180.0)
     parser.add_argument("--settings", action="store_true")
+    parser.add_argument("--manual-state", choices=("hidden", "blue", "black"))
     args = parser.parse_args()
 
     app = QApplication.instance() or QApplication([])
@@ -57,6 +59,14 @@ def main() -> None:
     if args.scroll_reason_bottom:
         scroll_bar = window.step_reason.verticalScrollBar()
         scroll_bar.setValue(scroll_bar.maximum())
+        app.processEvents()
+    if args.manual_state:
+        state = {
+            "hidden": CellVisualType.HIDDEN,
+            "blue": CellVisualType.BLUE,
+            "black": CellVisualType.BLACK,
+        }[args.manual_state]
+        window.state_buttons[state].click()
         app.processEvents()
 
     target = window

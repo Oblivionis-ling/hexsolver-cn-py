@@ -2,16 +2,16 @@
 
 ## 目标
 
-`0.6.4` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。打包层不重写生成器或求解器；源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享同一套版本化种子缓存实现。本版只修复推理正文滚动到底时的末行安全区。
+`0.6.5` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。打包层不重写生成器或求解器；源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享同一套版本化种子缓存实现。本版只调整三个手动标记按钮的选中外轮廓颜色。
 
 发布资产：
 
 ```text
-HexInfiniteSolver-0.6.4-windows-x64.exe
-HexInfiniteSolver-0.6.4-windows-x64.exe.sha256
+HexInfiniteSolver-0.6.5-windows-x64.exe
+HexInfiniteSolver-0.6.5-windows-x64.exe.sha256
 ```
 
-2026-08-06 已验证 `0.6.4` 发布成品：96,482,715 字节（92.01 MiB），SHA-256 为 `511c62826d59996ac68cb93450f639f9d0ec563fa5003661d8ec44c6fefa2783`。Windows 版本资源中的 FileVersion 和 ProductVersion 均为 `0.6.4`。
+2026-08-06 已验证 `0.6.5` 发布成品：96,482,459 字节（92.01 MiB），SHA-256 为 `8bf2ac33929b7e395a137f3d352a880a8c2e1bd8c07898c6d1bb92c25a415eb6`。Windows 版本资源中的 FileVersion 和 ProductVersion 均为 `0.6.5`。
 
 ## 成品包含什么
 
@@ -22,7 +22,7 @@ HexInfiniteSolver-0.6.4-windows-x64.exe.sha256
 - Qt 插件、字体图标、应用图标和 Windows 版本资源。
 - 种子缓存与设置页；缓存数据在运行时写入用户的 `%LOCALAPPDATA%\HexInfiniteSolver\seed-cache\v1`，不会预置在 EXE 中。
 
-截图入口当前关闭，因此 0.6.4 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
+截图入口当前关闭，因此 0.6.5 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
 
 ## 成品不包含什么
 
@@ -60,6 +60,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 - 核对窗口标题、最小尺寸、默认尺寸、300 px 侧栏和截图入口关闭状态；
 - 核对步骤历史和重复统计控件已移除、推理原因区域获得预期高度；
 - 核对推理正文严格位于固定按钮栏上方，并且手动标记图例采用紧凑尺寸；
+- 依次点击未知、蓝格、排除按钮，核对互斥选中状态以及黑、橘、蓝三种轮廓的实际渲染像素；
 - 写入 80 行合成长解释、滚动到末尾，并直接检查末尾光标完整位于文本视口内且具有 28 px 根帧安全尾距；
 - 核对全部行线索存在、可见并位于棋盘格上层；
 - 核对右下角设置入口可访问，设置页显示真实缓存目录；
