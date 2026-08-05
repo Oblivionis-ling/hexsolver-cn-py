@@ -9,11 +9,11 @@
 
 - [`../images/hard-seed1.png`](../images/hard-seed1.png)：Hard seed 1，已修正棋盘方向和左右斜向标签。
 - [`../images/easy-seed1.png`](../images/easy-seed1.png)：Easy seed 1，226 格大盘与初始公开信息。
-- [`ui-v064-fullscreen-reason-bottom.png`](ui-v064-fullscreen-reason-bottom.png)：0.6.4 全屏类宽屏布局中，Hard seed 3 第 55 步滚动到推理末尾。
-- [`ui-v064-settings-720x480.png`](ui-v064-settings-720x480.png)：0.6.4 当前种子缓存设置页，逻辑尺寸 `720 × 480`。
+- [`ui-v065-fullscreen-reason-bottom.png`](ui-v065-fullscreen-reason-bottom.png)：0.6.5 全屏类宽屏布局中，Hard seed 3 第 55 步滚动到推理末尾；默认未知按钮使用黑色选中轮廓。
+- [`ui-v065-settings-720x480.png`](ui-v065-settings-720x480.png)：0.6.5 当前种子缓存设置页，逻辑尺寸 `720 × 480`。
 - Implementation pixels: `2880 × 2048`.
 - Logical viewport: `1440 × 1024` at device pixel ratio `2.0`.
-- 仓库只保留当前 `0.6.4` 的应用界面截图；旧版布局截图已移除，演进过程保留在下方文字记录和开发历史中。
+- 仓库只保留当前 `0.6.5` 的应用界面截图；旧版布局截图已移除，演进过程保留在下方文字记录和开发历史中。
 
 **Normalized comparison**
 
@@ -59,7 +59,7 @@ The current Hard runtime capture now shows the same intended content class as th
 
 - Earlier P2: the history trail used generic hex icons without step numbers and the rail was wider than the selected source.
 - Fix: add numbered hex step markers, center the manual-marking header, set the rail to `300` logical pixels, and tighten board-stage padding.
-- Post-fix evidence was superseded by the current `0.6.4` captures; the obsolete intermediate screenshot is no longer retained.
+- Post-fix evidence was superseded by the current `0.6.5` captures; the obsolete intermediate screenshot is no longer retained.
 
 ## Follow-up polish
 
@@ -102,6 +102,13 @@ The current Hard runtime capture now shows the same intended content class as th
 - Replayed Hard seed `00000003` through 54 applied moves and scrolled step 55 to the bottom in a full-screen-class wide layout. The final sentence is fully visible with clear space above the fixed action bar.
 - Source and packaged regressions now inspect the end cursor rectangle directly and require at least 16 px of visible clearance, rather than only comparing the outer widget geometries.
 
+### Pass 9 (`0.6.5`)
+
+- Replaced the shared cyan checked outline with state-specific active outlines: hidden uses charcoal-black, blue uses orange, and excluded uses cyan-blue.
+- Kept the existing orange/blue/charcoal fills, `60 × 56` button size, white unchecked outline, shadow, tooltip and accessibility metadata.
+- Captured all three checked states on the real Windows Qt platform; the committed full-screen frame shows the default hidden button with its black outline.
+- Source and packaged regressions click each button, verify exclusive selection and count exact target-color pixels in the rendered button image.
+
 ## Implementation checklist
 
 - [x] Selected direction 2 reproduced as a functional two-column desktop UI.
@@ -111,8 +118,9 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Hard seed 1 at `1440 × 1024` and `1120 × 760` passed visual inspection.
 - [x] Easy seed 1 dense-board capture passed visual inspection.
 - [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
-- [x] Fifty-three automated core, cache, bridge, solver and Qt workflow tests pass.
+- [x] Fifty-four automated core, cache, bridge, solver and Qt workflow tests pass.
 - [x] Full-screen long-reason bottom capture and end-cursor visibility check pass.
+- [x] Hidden, blue and excluded buttons render black, orange and blue active outlines respectively.
 - [x] No actionable P0/P1/P2 visual findings remain.
 
 final result: passed

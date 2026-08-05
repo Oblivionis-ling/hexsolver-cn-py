@@ -6,7 +6,7 @@ import traceback
 from pathlib import Path
 
 from PySide6.QtCore import QSize
-from PySide6.QtGui import QTextCursor
+from PySide6.QtGui import QColor, QTextCursor
 from PySide6.QtWidgets import QApplication
 
 from .app import MainWindow, SCREENSHOT_IMPORT_ENABLED, STEP_REASON_BOTTOM_SAFE_MARGIN
@@ -71,12 +71,37 @@ def _verify_reason_bottom_safe_area(window: MainWindow, app: QApplication) -> No
     end_rect = window.step_reason.cursorRect(cursor)
     visible_bottom = window.step_reason.viewport().rect().bottom()
     if end_rect.bottom() > visible_bottom - 16:
-        raise RuntimeError("0.6.4 打包界面的推理末行仍被底部操作栏截断。")
+        raise RuntimeError("打包界面的推理末行仍被底部操作栏截断。")
     if (
         window.step_reason.document().rootFrame().frameFormat().bottomMargin()
         < STEP_REASON_BOTTOM_SAFE_MARGIN
     ):
-        raise RuntimeError("0.6.4 打包界面缺少推理正文末尾安全区。")
+        raise RuntimeError("打包界面缺少推理正文末尾安全区。")
+
+
+def _verify_manual_outline_colors(window: MainWindow, app: QApplication) -> None:
+    expected = {
+        CellVisualType.HIDDEN: "#3D3F42",
+        CellVisualType.BLUE: "#FFA814",
+        CellVisualType.BLACK: "#0DA9E5",
+    }
+    for state, expected_color in expected.items():
+        button = window.state_buttons[state]
+        button.click()
+        app.processEvents()
+        color = QColor(expected_color)
+        if window.selected_state is not state or button.outline_color() != color:
+            raise RuntimeError(f"手动标记 {state.value} 的选中轮廓颜色不正确。")
+        image = button.grab().toImage()
+        rendered_outline_pixels = sum(
+            image.pixelColor(x, y).rgb() == color.rgb()
+            for x in range(image.width())
+            for y in range(image.height())
+        )
+        if rendered_outline_pixels <= 30:
+            raise RuntimeError(f"手动标记 {state.value} 没有实际绘制选中轮廓。")
+    window.state_buttons[CellVisualType.HIDDEN].click()
+    app.processEvents()
 
 
 def run_package_smoke_test() -> int:
@@ -119,6 +144,7 @@ def run_package_smoke_test() -> int:
         _verify_reason_bottom_safe_area(window, app)
         if any(button.size() != QSize(60, 56) for button in window.state_buttons.values()):
             raise RuntimeError("打包界面的手动标记图例没有缩小。")
+        _verify_manual_outline_colors(window, app)
         row_items = window.stage.board_view.row_clue_items
         if len(row_items) != len(window.session.board.row_clues) or not all(
             item.isVisible() and item.zValue() > 4 for item in row_items

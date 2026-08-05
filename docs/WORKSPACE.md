@@ -24,14 +24,14 @@ F:\SteamLibrary\steamapps\common\Hexcells Infinite
 - Python 应用、Hard 纯 Python 生成器和 Easy 无 Unity 托管宿主源码；
 - 一键启动、依赖、诊断和测试；
 - `tests/fixtures/` 中两个小型结构化 TSV 回归夹具；
-- `docs/images/` 中两张生成结果证据，以及 `docs/design/` 中两张 0.6.4 当前界面证据；
+- `docs/images/` 中两张生成结果证据，以及 `docs/design/` 中两张 0.6.5 当前界面证据；
 - 开发历史、算法、路线、设计验收和研究资料。
 
 以下内容有用但只保留在本地，并由 `.gitignore` 排除：
 
 - `.conda_env/`：当前一键启动环境，可由 `run.ps1` 重建；
 - `managed_core/bin/`：Easy 托管核心构建产物，可由 `managed_core/build.ps1` 重建；
-- `dist/`：只保留最新 0.6.4 单文件成品与 SHA-256；
+- `dist/`：只保留最新 0.6.5 单文件成品与 SHA-256；
 - `build/`：PyInstaller 中间目录，发布验证后删除，需要时可由 `packaging/build_app.ps1` 重建；
 - `tests/images/`、`tests/labels/`：含原版游戏截图的 OCR 本地数据；
 - `tests/reports/`：临时视觉 QA 输出；
@@ -79,6 +79,12 @@ Easy 托管核心的真实集成校验仍需要合法安装中的 `Assembly-CSha
 - 删除已被 0.6.4 当前截图替代的旧版 UI 图片；版本演进仍保留在 `DEVELOPMENT_HISTORY.md` 和本文件的文字记录中。
 - 2026-08-05 日期归档经确认均为重复或可重建内容，已移入回收站；`reverse_harness`、OCR 数据和项目环境继续保留。
 - GitHub 仅保留最新正式 Release 和版本标签；完整源码提交历史继续由 `main` 保存。
+
+## 2026-08-06 0.6.5 更新
+
+- 当前源码、版本号、README、Windows 版本资源和发布文件名统一更新为 `0.6.5`。
+- `docs/design/` 用 0.6.5 全屏推理和设置页截图替换 0.6.4 截图；版本演进继续保留为文字历史。
+- 本地与 GitHub 发布资产继续遵守“只保留最新正式版本”的整理原则。
 
 ## 清理原则
 
