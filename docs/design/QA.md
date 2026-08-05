@@ -10,9 +10,12 @@
 - [`../images/hard-seed1.png`](../images/hard-seed1.png)：Hard seed 1，已修正棋盘方向和左右斜向标签。
 - [`../images/easy-seed1.png`](../images/easy-seed1.png)：Easy seed 1，226 格大盘与初始公开信息。
 - [`../images/ui-overview.png`](../images/ui-overview.png)：最终双栏信息架构与操作状态。
+- [`ui-v062-hard-seed3-1440x1024.png`](ui-v062-hard-seed3-1440x1024.png)：0.6.2 Hard seed 3 第 55 步长全局推理首屏。
+- [`ui-v062-hard-seed3-1120x760.png`](ui-v062-hard-seed3-1120x760.png)：0.6.2 最小窗口长推理首屏。
+- [`ui-v062-hard-seed3-1120x760-bottom.png`](ui-v062-hard-seed3-1120x760-bottom.png)：0.6.2 最小窗口滚动到推理末尾。
 - Implementation pixels: `2880 × 2048`.
 - Logical viewport: `1440 × 1024` at device pixel ratio `2.0`.
-- `1120 × 760` 窄窗口和逐步过程的中间证据保存在本地日期归档，不进入公开仓库。
+- `1120 × 760` 窄窗口的 0.6.2 长推理首屏与末尾证据已进入公开仓库；其他中间过程仍保存在本地日期归档。
 
 **Normalized comparison**
 
@@ -25,10 +28,10 @@
 No actionable P0, P1, or P2 differences remain for the selected information architecture.
 
 - Fonts and typography: Chinese UI uses `Microsoft YaHei UI`; display numbers use `Bahnschrift`. Weight, hierarchy, line wrapping, and contrast remain legible at both tested window sizes. The pairing preserves the source's geometric-number and clean-Chinese-label treatment.
-- Spacing and layout rhythm: the implementation keeps the source's narrow left solving rail, large right board stage, separated seed/stat/manual/next-step groups, generous board whitespace, chamfered surfaces, thin borders, and light shadows. In `0.6.1`, the next-step panel consumes the freed history space; at `1120 × 760`, the reason area remains at least 220 px high while persistent controls stay visible.
+- Spacing and layout rhythm: the implementation keeps the source's narrow left solving rail, large right board stage, separated seed/manual/next-step groups, generous board whitespace, chamfered surfaces, thin borders, and light shadows. In `0.6.2`, the duplicate stats group is removed, the manual legend is compressed, and the next-step panel consumes the freed space; at `1120 × 760`, the reason area remains at least 300 px high while persistent controls stay visible.
 - Colors and tokens: unknown, blue, clue, background, border, selected-step, and disabled states map consistently to the source orange/cyan/charcoal/light-gray palette. Text contrast remains usable.
 - Image quality and asset fidelity: the selected design contains no photographic or illustrative raster assets. The board is implemented as interactive native geometry, not a placeholder image. General controls use the QtAwesome icon library; the numbered step marker is product data rendered in the same hexagonal grammar.
-- Copy and content: seed, difficulty, remaining count, manual states, action, coordinate, reason, runtime generation state, and failure recovery are coherent in standalone use. The full Chinese reason remains available through a substantially larger scrollable area at both tested window sizes.
+- Copy and content: seed, difficulty, remaining count, manual states, action, coordinate, reason, runtime generation state, and failure recovery are coherent in standalone use. The full Chinese reason remains available through a substantially larger scrollable area at both tested window sizes, while the fixed action bar never overlaps the text viewport.
 - Icons and interaction states: copy, import, undo, reset, zoom, fit, next, apply, selected difficulty, selected manual state, and target-cell states are present and visually distinct.
 - Accessibility: controls use native Qt semantics and keyboard focus behavior, include tooltips, retain high-contrast active states, and use practical click targets. There is no continuous animation that requires reduced-motion handling.
 
@@ -77,6 +80,14 @@ The current Hard runtime capture now shows the same intended content class as th
 - Every row-clue item is tracked, forced visible and opaque during board synchronization, and rendered above board cells.
 - Viewport safety margins keep outer clues clear of the mode chip, remaining counter and bottom-right tool rail.
 
+### Pass 6 (`0.6.2`)
+
+- Removed the duplicate remaining/conflict card; the board counter remains the single remaining-value display.
+- Reduced manual state controls to `60 × 56`, removed text drawn below each hex, and retained tooltip plus accessible name/description.
+- Split the reason text viewport and the 46 px action bar into separate opaque layout regions; the text region has a bottom inset and cannot render under the buttons.
+- Replayed Hard seed `00000003` through 54 applied moves and captured its 1709-character global proof at `1440 × 1024` and `1120 × 760`.
+- Verified the minimum window at both the top and bottom of the reason scroll range; the final sentence remains fully visible above the action bar.
+
 ## Implementation checklist
 
 - [x] Selected direction 2 reproduced as a functional two-column desktop UI.
@@ -85,6 +96,7 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] `1120 × 760` layout-resilience capture completed.
 - [x] Hard seed 1 at `1440 × 1024` and `1120 × 760` passed visual inspection.
 - [x] Easy seed 1 dense-board capture passed visual inspection.
+- [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
 - [x] Forty-five automated core, bridge, solver and Qt workflow tests pass.
 - [x] No actionable P0/P1/P2 visual findings remain.
 

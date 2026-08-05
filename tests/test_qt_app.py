@@ -51,17 +51,23 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.assertIsNone(self.window.current_move)
         self.assertEqual(move.coord, self.window.session.history[-1].coord)
 
-    def test_sidebar_removes_history_and_prioritizes_reason_panel(self) -> None:
+    def test_sidebar_removes_secondary_panels_and_prioritizes_reason_panel(self) -> None:
         self.window.show()
         self.app.processEvents()
 
         self.assertFalse(hasattr(self.window, "history"))
         self.assertFalse(hasattr(self.window, "history_list"))
-        self.assertGreaterEqual(self.window.step_reason.height(), 400)
+        self.assertFalse(hasattr(self.window, "remaining_value"))
+        self.assertFalse(hasattr(self.window, "error_value"))
+        self.assertGreaterEqual(self.window.step_reason.height(), 560)
+        self.assertTrue(all(button.size().width() == 60 for button in self.window.state_buttons.values()))
+        self.assertTrue(all(button.size().height() == 56 for button in self.window.state_buttons.values()))
+        self.assertTrue(all(button.accessibleName() for button in self.window.state_buttons.values()))
+        self.assertFalse(self.window.stage.counter_badge.grab().isNull())
 
         self.window.resize(1120, 760)
         self.app.processEvents()
-        self.assertGreaterEqual(self.window.step_reason.height(), 220)
+        self.assertGreaterEqual(self.window.step_reason.height(), 300)
 
     def test_all_row_clues_remain_visible_above_board_items(self) -> None:
         view = self.window.stage.board_view
@@ -103,6 +109,13 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.assertGreater(self.window.step_reason.verticalScrollBar().maximum(), 0)
         self.assertEqual(0, self.window.step_reason.verticalScrollBar().value())
         self.assertTrue(self.window.apply_button.isEnabled())
+        self.assertLess(
+            self.window.step_reason.geometry().bottom(),
+            self.window.step_action_bar.geometry().top(),
+        )
+        scroll_bar = self.window.step_reason.verticalScrollBar()
+        scroll_bar.setValue(scroll_bar.maximum())
+        self.assertEqual(scroll_bar.maximum(), scroll_bar.value())
 
     def test_screenshot_import_is_disabled_in_ui_and_guarded_in_handler(self) -> None:
         board_before = self.window.session.board

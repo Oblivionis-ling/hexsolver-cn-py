@@ -14,11 +14,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("output", type=Path)
     parser.add_argument("--suggestion", action="store_true")
+    parser.add_argument("--scroll-reason-bottom", action="store_true")
     parser.add_argument("--apply-steps", type=int, default=0)
     parser.add_argument("--width", type=int, default=1440)
     parser.add_argument("--height", type=int, default=1024)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--difficulty", choices=("easy", "hard"), default="hard")
+    parser.add_argument("--generation-timeout", type=float, default=180.0)
     args = parser.parse_args()
 
     app = QApplication.instance() or QApplication([])
@@ -34,7 +36,7 @@ def main() -> None:
         window.easy_button.setChecked(args.difficulty == "easy")
         window.hard_button.setChecked(args.difficulty == "hard")
         window.generate_seed_board()
-        deadline = time.monotonic() + 60.0
+        deadline = time.monotonic() + args.generation_timeout
         while window._generation_thread is not None and time.monotonic() < deadline:
             app.processEvents()
             time.sleep(0.02)
@@ -50,6 +52,10 @@ def main() -> None:
         window.solve_next_step()
         window.stage.toast.hide()
     app.processEvents()
+    if args.scroll_reason_bottom:
+        scroll_bar = window.step_reason.verticalScrollBar()
+        scroll_bar.setValue(scroll_bar.maximum())
+        app.processEvents()
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     if not window.grab().save(str(args.output), "PNG"):

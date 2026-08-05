@@ -2,16 +2,16 @@
 
 ## 目标
 
-`0.6.1` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。打包层不重写生成器或求解器；源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动。
+`0.6.2` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。打包层不重写生成器或求解器；源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动。
 
 发布资产：
 
 ```text
-HexInfiniteSolver-0.6.1-windows-x64.exe
-HexInfiniteSolver-0.6.1-windows-x64.exe.sha256
+HexInfiniteSolver-0.6.2-windows-x64.exe
+HexInfiniteSolver-0.6.2-windows-x64.exe.sha256
 ```
 
-2026-08-05 已验证 `0.6.1` 发布成品：96,459,453 字节（91.99 MiB），SHA-256 为 `01d8655f78d2aca7091ff60c247312421b7189cce6e8546e37a6ca8196971b28`。
+2026-08-05 已验证 `0.6.2` 发布成品：96,460,100 字节（91.99 MiB），SHA-256 为 `ff8768de83158a22f622bfa357fea8535cc5a689375cb04265fea555cfa417ed`。Windows 版本资源中的 FileVersion 和 ProductVersion 均为 `0.6.2`。
 
 ## 成品包含什么
 
@@ -21,7 +21,7 @@ HexInfiniteSolver-0.6.1-windows-x64.exe.sha256
 - 项目自有的 `HexcellsHeadless.exe`、`UnityEngine.dll` 和 `TextMeshPro-5.6-Runtime.dll` 最小兼容宿主。
 - Qt 插件、字体图标、应用图标和 Windows 版本资源。
 
-截图入口当前关闭，因此 0.6.1 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
+截图入口当前关闭，因此 0.6.2 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
 
 ## 成品不包含什么
 
@@ -57,7 +57,8 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 
 - 创建真实 `QApplication` 和 `MainWindow`；
 - 核对窗口标题、最小尺寸、默认尺寸、300 px 侧栏和截图入口关闭状态；
-- 核对步骤历史控件已移除、推理原因区域获得预期高度；
+- 核对步骤历史和重复统计控件已移除、推理原因区域获得预期高度；
+- 核对推理正文严格位于固定按钮栏上方，并且手动标记图例采用紧凑尺寸；
 - 核对全部行线索存在、可见并位于棋盘格上层；
 - 核对单文件内的三个 Easy 托管宿主文件；
 - 生成 Easy seed 1，并核对第一条建议与私有答案；

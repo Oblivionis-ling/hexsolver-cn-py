@@ -226,7 +226,6 @@ class MainWindow(QMainWindow):
         layout.setSpacing(9)
 
         layout.addWidget(self._build_seed_panel())
-        layout.addWidget(self._build_stats_panel())
         layout.addWidget(self._build_manual_panel())
         self.step_panel = self._build_step_panel()
         layout.addWidget(self.step_panel, 1)
@@ -286,51 +285,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.generate_button)
         return panel
 
-    def _build_stats_panel(self) -> QWidget:
-        panel = ChamferPanel(chamfer=14)
-        layout = QHBoxLayout(panel)
-        layout.setContentsMargins(16, 10, 16, 11)
-        layout.setSpacing(0)
-
-        remaining_box = QVBoxLayout()
-        remaining_box.setSpacing(0)
-        remaining_label = QLabel("剩余")
-        remaining_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        remaining_label.setObjectName("MutedLabel")
-        self.remaining_value = QLabel("0")
-        self.remaining_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.remaining_value.setStyleSheet(
-            f"font-family: Bahnschrift; font-size: 29px; font-weight: 650; color: {COLORS['blue']};"
-        )
-        remaining_box.addWidget(remaining_label)
-        remaining_box.addWidget(self.remaining_value)
-        layout.addLayout(remaining_box, 1)
-
-        divider = QFrame()
-        divider.setFrameShape(QFrame.Shape.VLine)
-        divider.setStyleSheet(f"color: {COLORS['border']};")
-        layout.addWidget(divider)
-
-        error_box = QVBoxLayout()
-        error_box.setSpacing(0)
-        error_label = QLabel("冲突")
-        error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        error_label.setObjectName("MutedLabel")
-        self.error_value = QLabel("0")
-        self.error_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.error_value.setStyleSheet(
-            f"font-family: Bahnschrift; font-size: 29px; font-weight: 650; color: {COLORS['text']};"
-        )
-        error_box.addWidget(error_label)
-        error_box.addWidget(self.error_value)
-        layout.addLayout(error_box, 1)
-        return panel
-
     def _build_manual_panel(self) -> QWidget:
         panel = ChamferPanel(chamfer=14)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(13, 13, 13, 10)
-        layout.setSpacing(5)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(2)
 
         header = QHBoxLayout()
         left_balance = QWidget()
@@ -352,9 +311,11 @@ class MainWindow(QMainWindow):
         layout.addLayout(header)
 
         states = QHBoxLayout()
-        states.setSpacing(5)
+        states.setSpacing(8)
+        states.addStretch(1)
         self.state_group = QButtonGroup(self)
         self.state_group.setExclusive(True)
+        self.state_buttons: dict[CellVisualType, StateButton] = {}
         for state, label in (
             (CellVisualType.HIDDEN, "未知"),
             (CellVisualType.BLUE, "蓝色"),
@@ -363,9 +324,11 @@ class MainWindow(QMainWindow):
             button = StateButton(state, label)
             button.clicked.connect(lambda checked=False, selected=state: self._select_state(selected))
             self.state_group.addButton(button)
+            self.state_buttons[state] = button
             states.addWidget(button)
             if state is CellVisualType.HIDDEN:
                 button.setChecked(True)
+        states.addStretch(1)
         layout.addLayout(states)
         return panel
 
@@ -392,21 +355,30 @@ class MainWindow(QMainWindow):
         self.step_reason.setReadOnly(True)
         self.step_reason.setPlainText("手动同步到卡住的位置后，获取一个必然成立的步骤。")
         self.step_reason.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.step_reason.setMinimumHeight(220)
+        self.step_reason.setMinimumHeight(300)
         self.step_reason.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.step_reason.document().setDocumentMargin(1)
+        self.step_reason.setFrameShape(QFrame.Shape.NoFrame)
+        self.step_reason.setViewportMargins(0, 0, 0, 6)
+        self.step_reason.document().setDocumentMargin(2)
         self.step_reason.setStyleSheet(
-            f"QTextEdit {{ font-size: 13px; color: {COLORS['muted']}; background: transparent; "
-            "border: none; padding: 0; }}"
+            f"QTextEdit {{ font-size: 13px; color: {COLORS['muted']}; background: {COLORS['panel']}; "
+            "border: none; padding: 0 2px 6px 0; }}"
         )
         layout.addWidget(self.step_reason, 1)
 
-        actions = QHBoxLayout()
+        self.step_action_bar = QWidget(panel)
+        self.step_action_bar.setObjectName("StepActionBar")
+        self.step_action_bar.setFixedHeight(46)
+        self.step_action_bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.step_action_bar.setStyleSheet(f"QWidget#StepActionBar {{ background: {COLORS['panel']}; }}")
+        actions = QHBoxLayout(self.step_action_bar)
+        actions.setContentsMargins(0, 4, 0, 0)
         actions.setSpacing(6)
         self.next_button = QPushButton("计算下一步")
         self.next_button.setObjectName("NextButton")
         self.next_button.setIcon(qta.icon("fa5s.chevron-right", color=COLORS["white"]))
         self.next_button.setStyleSheet(self._primary_button_style(COLORS["blue"], COLORS["blue_hover"], 38, 14))
+        self.next_button.setFixedHeight(38)
         self.next_button.clicked.connect(self.solve_next_step)
         actions.addWidget(self.next_button, 1)
 
@@ -416,11 +388,11 @@ class MainWindow(QMainWindow):
         self.apply_button.setIconSize(QSize(16, 16))
         self.apply_button.setStyleSheet(self._primary_button_style(COLORS["blue"], COLORS["blue_hover"], 38, 14))
         self.apply_button.setToolTip("把建议应用到本地盘面")
-        self.apply_button.setFixedWidth(42)
+        self.apply_button.setFixedSize(42, 38)
         self.apply_button.clicked.connect(self.apply_current_move)
         self.apply_button.setEnabled(False)
         actions.addWidget(self.apply_button)
-        layout.addLayout(actions)
+        layout.addWidget(self.step_action_bar)
         return panel
 
     @staticmethod
@@ -658,9 +630,7 @@ class MainWindow(QMainWindow):
         remaining = board.remaining_blue
         if remaining is None:
             remaining = len(board.hidden_cells())
-        self.remaining_value.setText(str(remaining))
         self.stage.counter_badge.set_value(remaining)
-        self.error_value.setText("0")
 
     def closeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         if self._generation_thread is not None and self._generation_thread.isRunning():

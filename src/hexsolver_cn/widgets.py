@@ -64,15 +64,17 @@ class StateButton(QAbstractButton):
         self.label = label
         self.setCheckable(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedSize(76, 88)
+        self.setFixedSize(60, 56)
         self.setToolTip(f"点击棋盘后设为{label}")
+        self.setAccessibleName(f"手动标记：{label}")
+        self.setAccessibleDescription(f"选择后，点击棋盘把格子设为{label}")
 
     def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        center = QPointF(self.width() / 2.0, 33.0)
-        radius = 25.0
+        center = QPointF(self.width() / 2.0, 27.0)
+        radius = 20.0
         points = [
             QPointF(
                 center.x() + radius * math.cos(math.radians(60 * index)),
@@ -94,14 +96,8 @@ class StateButton(QAbstractButton):
 
         if self.state is CellVisualType.BLACK:
             painter.setPen(QPen(QColor(COLORS["white"]), 2.4))
-            painter.drawLine(QPointF(center.x() - 6, center.y() - 6), QPointF(center.x() + 6, center.y() + 6))
-            painter.drawLine(QPointF(center.x() + 6, center.y() - 6), QPointF(center.x() - 6, center.y() + 6))
-
-        painter.setPen(QColor(COLORS["text"] if self.isChecked() else COLORS["muted"]))
-        font = QFont("Microsoft YaHei UI", 10)
-        font.setWeight(QFont.Weight.DemiBold if self.isChecked() else QFont.Weight.Normal)
-        painter.setFont(font)
-        painter.drawText(QRectF(0, 66, self.width(), 20), Qt.AlignmentFlag.AlignCenter, self.label)
+            painter.drawLine(QPointF(center.x() - 5, center.y() - 5), QPointF(center.x() + 5, center.y() + 5))
+            painter.drawLine(QPointF(center.x() + 5, center.y() - 5), QPointF(center.x() - 5, center.y() + 5))
         painter.end()
 
 

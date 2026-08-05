@@ -25,14 +25,14 @@ F:\SteamLibrary\steamapps\common\Hexcells Infinite
 - Python 应用、Hard 纯 Python 生成器和 Easy 无 Unity 托管宿主源码；
 - 一键启动、依赖、诊断和测试；
 - `tests/fixtures/` 中两个小型结构化 TSV 回归夹具；
-- `docs/images/` 中三张最终界面证据；
+- `docs/images/` 中三张基础界面证据，以及 `docs/design/` 中 0.6.2 长推理布局证据；
 - 开发历史、算法、路线、设计验收和研究资料。
 
 以下内容有用但只保留在本地，并由 `.gitignore` 排除：
 
 - `.conda_env/`：当前一键启动环境，可由 `run.ps1` 重建；
 - `managed_core/bin/`：Easy 托管核心构建产物，可由 `managed_core/build.ps1` 重建；
-- `build/`、`dist/`：0.6.1 PyInstaller 中间目录和单文件成品，可由 `packaging/build_app.ps1` 重建；
+- `build/`、`dist/`：0.6.2 PyInstaller 中间目录和单文件成品，可由 `packaging/build_app.ps1` 重建；
 - `tests/images/`、`tests/labels/`：含原版游戏截图的 OCR 本地数据；
 - `tests/reports/`：临时视觉 QA 输出；
 - `.vscode/`：打开仓库自身时使用的个人编辑器设置。
