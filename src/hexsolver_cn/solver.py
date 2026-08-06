@@ -61,9 +61,9 @@ class HexReasoningSolver:
     def next_step(self, board: Board) -> Optional[SuggestedMove]:
         """Return one deterministic, most explainable forced move."""
 
-        local_moves = self._collect_local_moves(board)
-        if local_moves:
-            return sorted(local_moves.values(), key=self._move_sort_key)[0]
+        for tier_moves in self._collect_local_move_tiers(board):
+            if tier_moves:
+                return sorted(tier_moves.values(), key=self._move_sort_key)[0]
         global_moves = self._collect_global_forced_moves(board, limit=1)
         return global_moves[0] if global_moves else None
 
@@ -86,6 +86,38 @@ class HexReasoningSolver:
         self._apply_subset_rule(board, constraints, moves)
         self._apply_remaining_rule(board, moves)
         return moves
+
+    def _collect_local_move_tiers(
+        self,
+        board: Board,
+    ) -> Iterable[Dict[Coord, SuggestedMove]]:
+        """Yield local deductions from simplest to most expensive.
+
+        ``next_step`` stops at the first non-empty tier, so a global
+        uniqueness proof is attempted only after every local tier is empty.
+        ``solve`` continues to use ``_collect_local_moves`` so its public
+        batch-candidate behavior remains unchanged.
+        """
+
+        constraints = self._constraint_specs(board)
+
+        moves: Dict[Coord, SuggestedMove] = {}
+        for spec in constraints:
+            self._apply_simple_count_rule(board, spec, moves)
+        yield moves
+
+        moves = {}
+        for spec in constraints:
+            self._apply_pattern_rule(board, spec, moves)
+        yield moves
+
+        moves = {}
+        self._apply_subset_rule(board, constraints, moves)
+        yield moves
+
+        moves = {}
+        self._apply_remaining_rule(board, moves)
+        yield moves
 
     def _constraint_specs(self, board: Board) -> List[ConstraintSpec]:
         specs: List[ConstraintSpec] = []

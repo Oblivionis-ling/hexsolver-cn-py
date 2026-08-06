@@ -13,13 +13,13 @@
 - [`ui-v071-reason-array-linked.png`](ui-v071-reason-array-linked.png)：0.7.1 固定同一理由中的长坐标数组，整段文字与全部数组成员作为一个组显示静态分层高亮。
 - Implementation pixels: `1440 × 1024`.
 - Logical viewport: `1440 × 1024` at device pixel ratio `1.0`.
-- 仓库只保留当前 `0.7.1` 的应用界面截图；旧版布局截图已移除，演进过程保留在下方文字记录和开发历史中。
+- 仓库保留 `0.7.1` 的应用界面截图作为当前 `0.7.2` 的视觉证据；0.7.2 只优化求解调度，没有修改 UI。
 
 **Normalized comparison**
 
 - 旧的并排比较图已经在 `0.6.4` 仓库整理时移除；仓库保留两张生成结果证据和两张当前应用界面截图。
 - 早期方案对照曾把 source 与 implementation 归一化到 `1440 × 1024`；该并排图已按仓库整理规则移除，比较结论保留在下方历史中。
-- 当前两张 `0.7.1` 证据直接使用 `1440 × 1024` 真实 Windows Qt 画面，展示演示盘、完整解释以及两类固定引用状态。
+- 当前两张视觉证据直接使用 `1440 × 1024` 真实 Windows Qt 画面，展示演示盘、完整解释以及两类固定引用状态；0.7.2 的界面与之相同。
 
 ## Findings
 
@@ -136,7 +136,7 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Easy seed 1 dense-board capture passed visual inspection.
 - [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
 - [x] 0.7.1 layered row/array reference highlights passed native Windows Qt visual inspection.
-- [x] Sixty-five automated core, cache, bridge, solver and Qt workflow tests pass.
+- [x] Sixty-nine automated core, cache, bridge, solver and Qt workflow tests pass.
 - [x] Full-screen long-reason bottom capture and end-cursor visibility check pass.
 - [x] Hidden, blue and excluded buttons render black, orange and blue active outlines respectively.
 - [x] Original-style mouse controls persist, map real left/right clicks, toggle back to unknown, and restore manual tools when disabled.
