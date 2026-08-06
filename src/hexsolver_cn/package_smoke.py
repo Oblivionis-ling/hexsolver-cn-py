@@ -138,6 +138,8 @@ def _verify_reason_interactions(window: MainWindow, app: QApplication) -> None:
     cursor.setPosition(group_reference.start + 1)
     if not cursor.charFormat().isAnchor():
         raise RuntimeError("打包界面的坐标组没有渲染为可交互引用。")
+    if cursor.charFormat().toolTip():
+        raise RuntimeError("推理引用仍会请求悬停提示框。")
 
     window.step_reason.reference_focus_changed.emit(row_reference, False)
     app.processEvents()
@@ -145,8 +147,14 @@ def _verify_reason_interactions(window: MainWindow, app: QApplication) -> None:
     if (
         board_view.reason_highlighted_row != row_reference.row_key
         or set(board_view.reason_highlighted_coords) != set(row_reference.coords)
+        or any(
+            not board_view._reason_halo_items[coord].isVisible()
+            or board_view._reason_overlay_items[coord].pen().style()
+            is not Qt.PenStyle.CustomDashLine
+            for coord in row_reference.coords
+        )
     ):
-        raise RuntimeError("行线索引用没有同步高亮棋盘行与覆盖格子。")
+        raise RuntimeError("行线索引用没有同步显示分层预览高亮。")
 
     window.step_reason._toggle_reference(group_reference)
     window.step_reason.reference_focus_changed.emit(group_reference, True)
@@ -156,8 +164,14 @@ def _verify_reason_interactions(window: MainWindow, app: QApplication) -> None:
         not board_view.reason_highlight_is_pinned
         or set(board_view.reason_highlighted_coords) != set(group_reference.coords)
         or cursor.charFormat().fontWeight() < QFont.Weight.Bold
+        or any(
+            not board_view._reason_halo_items[coord].isVisible()
+            or board_view._reason_overlay_items[coord].pen().style()
+            is not Qt.PenStyle.SolidLine
+            for coord in group_reference.coords
+        )
     ):
-        raise RuntimeError("坐标组引用没有固定棋盘高亮并加粗文字。")
+        raise RuntimeError("坐标组引用没有固定分层高亮并加粗文字。")
 
     window._update_step_card(None)
     app.processEvents()

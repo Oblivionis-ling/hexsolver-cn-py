@@ -249,6 +249,11 @@ class InteractiveReasonBrowser(QTextBrowser):
         super().leaveEvent(event)
 
     def viewportEvent(self, event: QEvent) -> bool:
+        # References already communicate their state through text and board
+        # highlighting. Suppress Qt's hover help path completely so no native
+        # tooltip can obscure the reasoning text.
+        if event.type() == QEvent.Type.ToolTip:
+            return True
         if event.type() == QEvent.Type.Leave:
             self._clear_hover()
         return super().viewportEvent(event)
@@ -292,7 +297,7 @@ class InteractiveReasonBrowser(QTextBrowser):
             text_format = QTextCharFormat()
             text_format.setAnchor(True)
             text_format.setAnchorHref(self._href(reference))
-            text_format.setToolTip("悬停查看棋盘 · 点击固定高亮")
+            text_format.setToolTip("")
             text_format.setFontUnderline(False)
             text_format.setForeground(QColor(COLORS["reason_text"]))
             text_format.setBackground(QColor(0, 0, 0, 0))

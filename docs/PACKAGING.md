@@ -2,16 +2,16 @@
 
 ## 目标
 
-`0.7.0` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。打包层不重写生成器或求解器；源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享同一套版本化种子缓存实现。本版增加推理坐标、坐标组与行线索的富文本/棋盘联动层。
+`0.7.1` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。打包层不重写生成器或求解器；源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享同一套版本化种子缓存实现。本版移除推理引用悬停提示框，并将棋盘联动更新为柔光与精细虚/实线组成的分层高亮。
 
 发布资产：
 
 ```text
-HexInfiniteSolver-0.7.0-windows-x64.exe
-HexInfiniteSolver-0.7.0-windows-x64.exe.sha256
+HexInfiniteSolver-0.7.1-windows-x64.exe
+HexInfiniteSolver-0.7.1-windows-x64.exe.sha256
 ```
 
-2026-08-07 已验证 `0.7.0` 发布成品：96,503,533 字节（92.03 MiB），SHA-256 为 `d0d93db892ad62141b5053f9519326baaea7e19971bd53d50619835b8e290fa6`。Windows 版本资源中的 FileVersion 和 ProductVersion 均为 `0.7.0`。
+2026-08-07 已验证 `0.7.1` 发布成品：96,504,408 字节（92.03 MiB），SHA-256 为 `a62868ea1b7b8498f4809f9bd74dbf4bf28e9cdb4205ba1e5b2757f1594a5abc`。Windows 版本资源中的 FileVersion 和 ProductVersion 均为 `0.7.1`。
 
 ## 成品包含什么
 
@@ -22,7 +22,7 @@ HexInfiniteSolver-0.7.0-windows-x64.exe.sha256
 - Qt 插件、字体图标、应用图标和 Windows 版本资源。
 - 种子缓存、用户体验偏好与设置页；缓存数据和 Qt 用户设置在运行时写入用户目录，不会预置在 EXE 中。
 
-截图入口当前关闭，因此 0.7.0 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
+截图入口当前关闭，因此 0.7.1 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
 
 ## 成品不包含什么
 
@@ -63,7 +63,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 - 依次点击未知、蓝格、排除按钮，核对互斥选中状态以及黑、橘、蓝三种轮廓的实际渲染像素；
 - 在设置页开启原版式鼠标操作，核对左键排除、右键蓝色、重复同键恢复未知，以及开启/关闭时手动工具的禁用与恢复；
 - 写入 80 行合成长解释、滚动到末尾，并直接检查末尾光标完整位于文本视口内且具有 28 px 根帧安全尾距；
-- 生成行名称与坐标组富文本引用，核对解释原文不变、锚点存在、行线索与覆盖格同步高亮、点击固定后文字加粗，并确认换理由会清理固定状态；
+- 生成行名称与坐标组富文本引用，核对解释原文不变、锚点存在且无悬停提示框、行线索与双层覆盖同步高亮、预览/固定分别使用虚线/实线、点击固定后文字加粗，并确认换理由会清理固定状态；
 - 核对全部行线索存在、可见并位于棋盘格上层；
 - 核对右下角设置入口可访问，设置页显示真实缓存目录和鼠标操作开关；
 - 核对单文件内的三个 Easy 托管宿主文件；
