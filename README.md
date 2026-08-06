@@ -1,23 +1,23 @@
 # HexInfinite 种子求解器
 
-当前版本：`0.6.5`
+当前版本：`0.7.0`
 
 这是一个面向 `Hexcells Infinite` 的 Windows 中文逐步求解器。输入种子号并选择 Easy/Hard 后，程序会在本地复刻原版地图，不再启动 `Hexcells Infinite.exe`；你可以手动同步当前进度，然后每次只获取一个必然步骤和中文理由。
 
 ## 下载 Windows 单文件版
 
-从 [GitHub Release v0.6.5](https://github.com/Oblivionis-ling/hexsolver-cn-py/releases/tag/v0.6.5) 下载：
+从 [GitHub Release v0.7.0](https://github.com/Oblivionis-ling/hexsolver-cn-py/releases/tag/v0.7.0) 下载：
 
-- `HexInfiniteSolver-0.6.5-windows-x64.exe`
-- `HexInfiniteSolver-0.6.5-windows-x64.exe.sha256`
+- `HexInfiniteSolver-0.7.0-windows-x64.exe`
+- `HexInfiniteSolver-0.7.0-windows-x64.exe.sha256`
 
-无需安装 Python、Conda 或项目依赖，下载后直接双击 EXE。`0.6.5` 沿用同一套生成器、求解器和种子缓存核心，为三个手动标记按钮增加独立的选中态轮廓，并可在设置中启用原版式鼠标操作：左键排除、右键标记蓝色。
+无需安装 Python、Conda 或项目依赖，下载后直接双击 EXE。`0.7.0` 沿用同一套生成器、求解器和种子缓存核心，把推理原因中的坐标、坐标数组和三方向行线索变成可交互引用：悬停时临时联动棋盘，点击后固定高亮并加粗文字，再次点击取消。
 
 系统要求：Windows 10/11 x64。Hard 完全离线可用；Easy 仍需要本机合法安装 Steam 版 `Hexcells Infinite`，程序只读其 `Assembly-CSharp.dll` 并校验版本，不会把原游戏 DLL、EXE 或存档打进安装包。由于当前成品未做商业代码签名，Windows 首次下载时可能显示 SmartScreen 提示；请用 Release 同时提供的 SHA-256 文件核对完整性。
 
-![0.6.5 手动标记轮廓与全屏推理末尾](docs/design/ui-v065-fullscreen-reason-bottom.png)
+![0.7.0 行线索引用与棋盘联动](docs/design/ui-v070-reason-row-linked.png)
 
-![0.6.5 鼠标操作与种子缓存设置页](docs/design/ui-v065-settings-720x600.png)
+![0.7.0 坐标数组与棋盘成组联动](docs/design/ui-v070-reason-array-linked.png)
 
 ## 已可用
 
@@ -31,6 +31,8 @@
 - 用户确认揭开格子后，自动显示该格在原版中刚出现的数字、连续/非连续或花格提示；撤销时一并恢复覆盖状态。
 - 局部规则、排列、子集差分、剩余数和 CP-SAT 全局兜底。
 - 一次只高亮一个必然步骤，并显示可滚动、可核查的中文推理过程。
+- 推理中的单个坐标、完整坐标数组和“横向 / 左下斜 / 右下斜”行引用可与棋盘联动；悬停使用低干扰虚线呼吸轮廓，点击固定后改为实线、文字加粗，数组成员会作为一个整体同时高亮。
+- 点击是悬停之外的完整替代操作；键盘聚焦引用后按 Enter/空格也可固定或取消。切换步骤、应用、撤销、重置或换图会自动清理交互状态。
 - 推理原因区域占据侧栏剩余空间，滚动正文与固定操作栏严格分离，长解释可完整查看；界面不再显示步骤历史和重复的“剩余/冲突”统计卡。
 - 推理文档末尾具有独立安全区；无论全屏、默认窗口还是最小窗口，滚动到底后最后一行都会完整停在按钮栏上方。
 - 三个方向的所有行线索始终显示在棋盘上层，并为顶部、右侧和工具栏预留安全边距。
@@ -59,13 +61,13 @@ Easy 托管程序集固定检查以下基线：
 D:\Desktop\HexInfinite\reverse_harness\game
 ```
 
-当前验证结果：Easy/Hard seed 1–50 的最终 TSV 均逐字段一致，并额外通过 `00000000`、`99999999` 两个边界种子；Hard 样本覆盖五种地图形状。`0.4.1` 修正了 Unity 世界坐标到 Qt 画布时 Y 轴方向相反造成的棋盘上下镜像；`0.4.2` 同步交换了镜像后的左右斜向标签；`0.4.3` 将所有步骤理由升级为详细可核查推理；`0.5.0` 封装为 Windows x64 单文件应用；`0.6.1` 扩大推理说明区、移除步骤历史展示并保证全部行线索常显；`0.6.2` 将长推理正文与按钮栏彻底分离、精简手动图例并删除重复统计卡；`0.6.3` 在生成流程外层增加安全缓存和设置管理；`0.6.4` 为推理文档增加与固定底栏无关的末尾安全区；`0.6.5` 为三种手动标记增加互相区分的选中轮廓，并增加可持久化的原版式左右键操作。上述版本均未修改任何推理或生成算法。seed 1/2 已与现有官方截图逐个核对轮廓和线索方位。`reverse_harness` 中的原版运行时桥只保留为显式差分校验工具，不在默认产品链路中。
+当前验证结果：Easy/Hard seed 1–50 的最终 TSV 均逐字段一致，并额外通过 `00000000`、`99999999` 两个边界种子；Hard 样本覆盖五种地图形状。`0.4.1` 修正了 Unity 世界坐标到 Qt 画布时 Y 轴方向相反造成的棋盘上下镜像；`0.4.2` 同步交换了镜像后的左右斜向标签；`0.4.3` 将所有步骤理由升级为详细可核查推理；`0.5.0` 封装为 Windows x64 单文件应用；`0.6.1` 扩大推理说明区、移除步骤历史展示并保证全部行线索常显；`0.6.2` 将长推理正文与按钮栏彻底分离、精简手动图例并删除重复统计卡；`0.6.3` 在生成流程外层增加安全缓存和设置管理；`0.6.4` 为推理文档增加与固定底栏无关的末尾安全区；`0.6.5` 增加手动标记选中轮廓与原版式左右键操作；`0.7.0` 增加推理数据与棋盘元素的动态联动。上述版本均未修改任何推理或生成算法。seed 1/2 已与现有官方截图逐个核对轮廓和线索方位。`reverse_harness` 中的原版运行时桥只保留为显式差分校验工具，不在默认产品链路中。
 
 性能边界：Easy 通常不到 1 秒；Hard 会忠实重放原版的多轮可解性验证与冗余线索裁剪，小图约数秒，少数复杂种子可能需要几十秒。首次生成始终在 UI 后台线程中执行；成功结果会自动缓存，相同 Build、后端、难度和种子的后续加载通常只需读取本地 JSON。
 
 ## 启动
 
-普通用户优先使用 Release 中的 `HexInfiniteSolver-0.6.5-windows-x64.exe`，直接双击即可。
+普通用户优先使用 Release 中的 `HexInfiniteSolver-0.7.0-windows-x64.exe`，直接双击即可。
 
 以下方式用于源码开发：
 
@@ -99,7 +101,7 @@ conda run -n hexsolver-cn python main.py
 3. 等待状态从“正在离线生成”变为“离线精确生成”。
 4. 默认可选择“未知 / 蓝色 / 排除”后左键点击棋盘；也可在设置中开启原版式操作，直接左键排除、右键标记蓝色。
 5. 点击“计算下一步”。
-6. 查看高亮目标、动作和中文理由；右侧勾选按钮可把建议应用到本地盘面。
+6. 查看高亮目标、动作和中文理由；把鼠标移到理由中的坐标、坐标数组或行名称上可预览对应棋盘元素，点击可固定/取消联动。右侧勾选按钮可把建议应用到本地盘面。
 
 原版式操作下，对同一格再次使用相同按键会恢复未知。中键拖动棋盘，滚轮缩放。右下角按钮可撤销、重置、缩放、适合窗口并打开设置。种子缓存默认位于 `%LOCALAPPDATA%\HexInfiniteSolver\seed-cache\v1`；设置页可管理鼠标操作、查看实际缓存路径和删除缓存。截图按钮当前为禁用状态，悬停会提示“截图识别精度优化中，暂时关闭”；当前请使用种子生成地图并手动同步游戏进度。
 
@@ -145,7 +147,7 @@ conda run -n hexsolver-cn python main.py
 .\test.ps1
 ```
 
-构建并验证 0.6.5 单文件成品：
+构建并验证 0.7.0 单文件成品：
 
 ```powershell
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\build_app.ps1
@@ -153,7 +155,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 
 构建脚本会执行源码测试、构建 Easy 托管核心、生成单文件 EXE、检查归档不含原游戏程序集，并启动真实成品完成 UI + Easy/Hard seed 1 冒烟测试。详细边界见 [Windows 打包与发布](docs/PACKAGING.md)。
 
-当前自动测试覆盖 TSV 合约、两套交错坐标相位、官方 Y 轴方向、Easy/Hard 样本、Unity RNG 位模式、默认后端不启动游戏、揭示/撤销、完整逐步回放、五类详细推理理由、三种手动标记轮廓的实际像素、长文本滚动显示、后台生成和 Qt 主流程。Easy/Hard seed 1–50 及两个八位边界种子已做原版逐字段差分；代表种子还会完整解到零未知格并逐步核对私有答案。
+当前 65 项自动测试覆盖 TSV 合约、两套交错坐标相位、官方 Y 轴方向、Easy/Hard 样本、Unity RNG 位模式、默认后端不启动游戏、揭示/撤销、完整逐步回放、五类详细推理理由、单坐标/长数组/三方向行引用解析、Qt 悬停/固定/清理联动、减少动态模式、三种手动标记轮廓的实际像素、长文本滚动显示、后台生成和 Qt 主流程。Easy/Hard seed 1–50 及两个八位边界种子已做原版逐字段差分；代表种子还会完整解到零未知格并逐步核对私有答案。
 
 仓库自带 `tests/fixtures/` 的 Easy/Hard seed 1 结构化夹具。没有原版程序集时，Easy 托管核心的真实集成项会明确跳过，其余单元测试和 Hard 离线测试仍可运行。
 
@@ -191,17 +193,18 @@ HexReasoningSolver.next_step()
 - `src/hexsolver_cn/hard_offline.py`：Hard 生成器与内置 `Solver/Set` 的纯 Python 精确移植。
 - `src/hexsolver_cn/original_bridge.py`：TSV 解析、盘面转换，以及仅用于显式差分的原版隔离桥。
 - `src/hexsolver_cn/board_view.py`：六边形 Qt 画布与行线索。
+- `src/hexsolver_cn/reason_interaction.py`：推理引用解析、富文本悬停/固定状态和键盘交互。
 - `src/hexsolver_cn/solver.py`：确定性局部规则与 CP-SAT 兜底。
 - `src/hexsolver_cn/session.py`：当前局面、剩余数、历史和撤销。
 - `src/hexsolver_cn/unity_random.py`：Unity 5.6.3f1 RNG 位兼容实现。
 - `src/hexsolver_cn/hard_generator.py`：Hard 初始形状、颜色与 Unity 随机序列。
 - `managed_core/`：C# 最小 Unity API 兼容层、Easy 宿主和一键构建脚本。
 - `tools/doctor.py`：离线后端诊断；原版启动差分必须显式启用。
-- `packaging/`：0.6.5 Windows 单文件构建、图标/版本资源和成品冒烟测试入口。
+- `packaging/`：0.7.0 Windows 单文件构建、图标/版本资源和成品冒烟测试入口。
 
 ## 文档
 
-- [开发历史](DEVELOPMENT_HISTORY.md)：从 `0.1.0` 截图原型到当前 `0.6.5` 版本。
+- [开发历史](DEVELOPMENT_HISTORY.md)：从 `0.1.0` 截图原型到当前 `0.7.0` 版本。
 - [工作区说明](docs/WORKSPACE.md)：本地目录、专有文件边界、清理与恢复规则。
 - [求解算法](docs/solver/ALGORITHM.md)：局部规则、CP-SAT 和全局反证。
 - [Windows 打包与发布](docs/PACKAGING.md)：单文件内容、构建、验证和专有文件边界。
