@@ -2,16 +2,16 @@
 
 ## 目标
 
-`0.7.1` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。打包层不重写生成器或求解器；源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享同一套版本化种子缓存实现。本版移除推理引用悬停提示框，并将棋盘联动更新为柔光与精细虚/实线组成的分层高亮。
+`0.7.2` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享同一套版本化种子缓存实现。本版把逐步推理改为严格的全场难度分层短路；UI、地图生成、缓存和解释模板保持不变。
 
 发布资产：
 
 ```text
-HexInfiniteSolver-0.7.1-windows-x64.exe
-HexInfiniteSolver-0.7.1-windows-x64.exe.sha256
+HexInfiniteSolver-0.7.2-windows-x64.exe
+HexInfiniteSolver-0.7.2-windows-x64.exe.sha256
 ```
 
-2026-08-07 已验证 `0.7.1` 发布成品：96,504,408 字节（92.03 MiB），SHA-256 为 `a62868ea1b7b8498f4809f9bd74dbf4bf28e9cdb4205ba1e5b2757f1594a5abc`。Windows 版本资源中的 FileVersion 和 ProductVersion 均为 `0.7.1`。
+2026-08-07 已验证 `0.7.2` 发布成品：96,501,119 字节（92.03 MiB），SHA-256 为 `0ee95231593f1d7b3be63cad51076c2d37718048f19bec87db1bee6f6b758741`。Windows 版本资源中的 FileVersion 和 ProductVersion 均为 `0.7.2`。
 
 ## 成品包含什么
 
@@ -22,7 +22,7 @@ HexInfiniteSolver-0.7.1-windows-x64.exe.sha256
 - Qt 插件、字体图标、应用图标和 Windows 版本资源。
 - 种子缓存、用户体验偏好与设置页；缓存数据和 Qt 用户设置在运行时写入用户目录，不会预置在 EXE 中。
 
-截图入口当前关闭，因此 0.7.1 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
+截图入口当前关闭，因此 0.7.2 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
 
 ## 成品不包含什么
 

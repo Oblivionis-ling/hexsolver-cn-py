@@ -24,14 +24,14 @@ F:\SteamLibrary\steamapps\common\Hexcells Infinite
 - Python 应用、Hard 纯 Python 生成器和 Easy 无 Unity 托管宿主源码；
 - 一键启动、依赖、诊断和测试；
 - `tests/fixtures/` 中两个小型结构化 TSV 回归夹具；
-- `docs/images/` 中两张生成结果证据，以及 `docs/design/` 中两张 0.7.1 当前界面证据；
+- `docs/images/` 中两张生成结果证据，以及 `docs/design/` 中两张 0.7.1 界面证据（0.7.2 未修改 UI）；
 - 开发历史、算法、路线、设计验收和研究资料。
 
 以下内容有用但只保留在本地，并由 `.gitignore` 排除：
 
 - `.conda_env/`：当前一键启动环境，可由 `run.ps1` 重建；
 - `managed_core/bin/`：Easy 托管核心构建产物，可由 `managed_core/build.ps1` 重建；
-- `dist/`：只保留最新 0.7.1 单文件成品与 SHA-256；
+- `dist/`：只保留最新 0.7.2 单文件成品与 SHA-256；
 - `build/`：PyInstaller 中间目录，发布验证后删除，需要时可由 `packaging/build_app.ps1` 重建；
 - `tests/images/`、`tests/labels/`：含原版游戏截图的 OCR 本地数据；
 - `tests/reports/`：临时视觉 QA 输出；
@@ -97,6 +97,12 @@ Easy 托管核心的真实集成校验仍需要合法安装中的 `Assembly-CSha
 - 求解器、详细解释生成、Easy/Hard 地图生成、种子缓存和私有答案隔离均保持不变。
 - `docs/design/` 用两张真实 Windows Qt 截图记录行名称固定联动和长坐标数组整体联动；旧版 0.6.5 界面截图已移入回收站，演进仍由开发历史保留。
 - `dist/` 与 GitHub Release 继续只保留最新正式版的 EXE 和 SHA-256；原游戏文件、OCR 私有数据和逆向环境仍不进入仓库或发布资产。
+
+## 2026-08-07 0.7.2 更新
+
+- `next_step()` 改为严格的全场分层短路：局部计数、排列、子集差分和全场剩余全部无果后，才进入全局唯一性反证。
+- Easy/Hard seed 1 继续完整解到零未知格并逐步匹配私有答案；全局调用次数没有增加，生成器、界面、缓存和解释模板不变。
+- 源码、版本资源、单文件成品与 Release 文件名统一为 `0.7.2`；界面无变化，因此继续复用 0.7.1 的真实 Qt 视觉证据。
 
 ## 清理原则
 
