@@ -227,15 +227,30 @@ class QtAppWorkflowTests(unittest.TestCase):
 
         self.assertEqual(set(coords), set(self.window.stage.board_view.reason_highlighted_coords))
         self.assertFalse(self.window.stage.board_view.reason_highlight_is_pinned)
+        board_view = self.window.stage.board_view
+        for coord in coords:
+            halo = board_view._reason_halo_items[coord]
+            accent = board_view._reason_overlay_items[coord]
+            self.assertTrue(halo.isVisible())
+            self.assertTrue(accent.isVisible())
+            self.assertIs(accent.pen().style(), Qt.PenStyle.CustomDashLine)
+            self.assertGreater(halo.pen().widthF(), accent.pen().widthF())
+            self.assertGreater(
+                halo.polygon().boundingRect().width(),
+                accent.polygon().boundingRect().width(),
+            )
         if self.window.stage.board_view._reason_animation_enabled:
             self.assertTrue(self.window.stage.board_view.reason_animation_active)
+            QTest.qWait(320)
+            self.app.processEvents()
+            self.assertFalse(self.window.stage.board_view.reason_animation_active)
 
         leave = QEvent(QEvent.Type.Leave)
         QApplication.sendEvent(self.window.step_reason, leave)
         self.app.processEvents()
         self.assertEqual((), self.window.stage.board_view.reason_highlighted_coords)
 
-    def test_reduced_motion_disables_reason_pulse_but_keeps_static_outline(self) -> None:
+    def test_reduced_motion_disables_reason_fade_but_keeps_layered_outline(self) -> None:
         board = self.window.session.board
         coord = next(iter(board.cells))
         reference = parse_reason_references(f"格子 ({coord[0]}, {coord[1]})", board)[0]
@@ -247,7 +262,27 @@ class QtAppWorkflowTests(unittest.TestCase):
 
         self.assertEqual((coord,), view.reason_highlighted_coords)
         self.assertFalse(view.reason_animation_active)
+        self.assertTrue(view._reason_halo_items[coord].isVisible())
+        self.assertAlmostEqual(0.30, view._reason_halo_items[coord].opacity(), places=2)
+        self.assertIs(
+            view._reason_overlay_items[coord].pen().style(),
+            Qt.PenStyle.CustomDashLine,
+        )
         view.deleteLater()
+
+    def test_reason_references_never_request_a_hover_tooltip(self) -> None:
+        coord = next(iter(self.window.session.board.cells))
+        self.window._set_step_reason(f"格子 ({coord[0]}, {coord[1]}) 必须判蓝。")
+        reference = self.window.step_reason.references[0]
+        cursor = QTextCursor(self.window.step_reason.document())
+        cursor.setPosition(reference.start + 1)
+
+        self.assertEqual("", cursor.charFormat().toolTip())
+        self.assertEqual("", self.window.step_reason.toolTip())
+        self.assertEqual("", self.window.step_reason.viewport().toolTip())
+        self.assertTrue(
+            self.window.step_reason.viewportEvent(QEvent(QEvent.Type.ToolTip))
+        )
 
     def test_row_reference_hover_highlights_row_clue_and_covered_cells(self) -> None:
         row = self.window.session.board.row_clues[0]
@@ -285,6 +320,13 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.assertGreaterEqual(cursor.charFormat().fontWeight(), QFont.Weight.Bold)
         self.assertEqual((coord,), self.window.stage.board_view.reason_highlighted_coords)
         self.assertTrue(self.window.stage.board_view.reason_highlight_is_pinned)
+        board_view = self.window.stage.board_view
+        self.assertTrue(board_view._reason_halo_items[coord].isVisible())
+        self.assertIs(
+            board_view._reason_overlay_items[coord].pen().style(),
+            Qt.PenStyle.SolidLine,
+        )
+        self.assertGreaterEqual(board_view._reason_halo_items[coord].opacity(), 0.38)
 
         self._click_reason_reference(reference)
         QApplication.sendEvent(self.window.step_reason, QEvent(QEvent.Type.Leave))

@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 from hexsolver_cn.app import MainWindow
 from hexsolver_cn.models import CellVisualType
 from hexsolver_cn.preferences import AppPreferences
+from hexsolver_cn.reason_interaction import ReasonReferenceKind
 from hexsolver_cn.settings_dialog import SettingsDialog
 from hexsolver_cn.theme import app_stylesheet
 
@@ -27,6 +28,7 @@ def main() -> None:
     parser.add_argument("--settings", action="store_true")
     parser.add_argument("--manual-state", choices=("hidden", "blue", "black"))
     parser.add_argument("--original-mouse-controls", action="store_true")
+    parser.add_argument("--pin-reason-reference", choices=("row", "array"))
     args = parser.parse_args()
 
     app = QApplication.instance() or QApplication([])
@@ -61,6 +63,45 @@ def main() -> None:
         window.solve_next_step()
         window.stage.toast.hide()
     app.processEvents()
+    if args.pin_reason_reference:
+        if (
+            args.pin_reason_reference == "row"
+            and not any(item.row_key is not None for item in window.step_reason.references)
+        ):
+            row = next(row for row in window.session.board.row_clues if row.clue_text)
+            linked_coords = tuple(
+                coord
+                for coord in row.coords
+                if window.session.board.get_cell(coord) is not None
+            )
+            coords_text = "[" + "、".join(
+                f"({q}, {r})" for q, r in linked_coords
+            ) + "]"
+            window._set_step_reason(
+                "推理过程：\n"
+                f"1. 条件：{row.display_name()} 的提示 {row.clue_text}。\n"
+                f"2. 关联格：{coords_text}。\n"
+                "3. 说明：固定行引用后，外侧线索与整行格子同步高亮。"
+            )
+            app.processEvents()
+        reference = next(
+            (
+                item
+                for item in window.step_reason.references
+                if (
+                    item.row_key is not None
+                    if args.pin_reason_reference == "row"
+                    else item.kind is ReasonReferenceKind.CELLS and len(item.coords) > 1
+                )
+            ),
+            None,
+        )
+        if reference is None:
+            raise SystemExit(
+                f"Current reasoning has no {args.pin_reason_reference} reference to pin."
+            )
+        window.step_reason._toggle_reference(reference)
+        app.processEvents()
     if args.scroll_reason_bottom:
         scroll_bar = window.step_reason.verticalScrollBar()
         scroll_bar.setValue(scroll_bar.maximum())

@@ -50,12 +50,13 @@ class HexBoardView(QGraphicsView):
         self._cell_text_items: Dict[Coord, QGraphicsSimpleTextItem] = {}
         self._row_clue_items: list[QGraphicsSimpleTextItem] = []
         self._row_clue_items_by_key: dict[RowReferenceKey, QGraphicsSimpleTextItem] = {}
+        self._reason_halo_items: Dict[Coord, QGraphicsPolygonItem] = {}
         self._reason_overlay_items: Dict[Coord, QGraphicsPolygonItem] = {}
         self._reason_reference: Optional[ReasonReference] = None
         self._reason_pinned = False
-        self._reason_animation_phase = 0.0
+        self._reason_animation_elapsed_ms = 0
         self._reason_animation_timer = QTimer(self)
-        self._reason_animation_timer.setInterval(80)
+        self._reason_animation_timer.setInterval(40)
         self._reason_animation_timer.timeout.connect(self._advance_reason_animation)
         self._reason_animation_enabled = (
             os.environ.get("HEXSOLVER_REDUCED_MOTION", "").strip().lower()
@@ -82,6 +83,7 @@ class HexBoardView(QGraphicsView):
         self._cell_text_items.clear()
         self._row_clue_items.clear()
         self._row_clue_items_by_key.clear()
+        self._reason_halo_items.clear()
         self._reason_overlay_items.clear()
         if self.board is None:
             return
@@ -116,8 +118,19 @@ class HexBoardView(QGraphicsView):
             self._cell_text_items[cell.coord] = text
             self._position_cell_text(cell.coord)
 
+            reason_halo = QGraphicsPolygonItem(
+                self._polygon(cx, cy, self._radius + 7.0)
+            )
+            reason_halo.setPen(QPen(Qt.PenStyle.NoPen))
+            reason_halo.setBrush(Qt.BrushStyle.NoBrush)
+            reason_halo.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+            reason_halo.setVisible(False)
+            reason_halo.setZValue(5.5)
+            self._scene.addItem(reason_halo)
+            self._reason_halo_items[cell.coord] = reason_halo
+
             reason_overlay = QGraphicsPolygonItem(
-                self._polygon(cx, cy, self._radius + 4.0)
+                self._polygon(cx, cy, self._radius + 4.6)
             )
             reason_overlay.setPen(QPen(Qt.PenStyle.NoPen))
             reason_overlay.setBrush(Qt.BrushStyle.NoBrush)
@@ -203,8 +216,12 @@ class HexBoardView(QGraphicsView):
         self._reason_animation_timer.stop()
         self._reason_reference = reference
         self._reason_pinned = bool(reference is not None and pinned)
-        self._reason_animation_phase = 0.0
+        self._reason_animation_elapsed_ms = 0
 
+        for item in self._reason_halo_items.values():
+            item.setVisible(False)
+            item.setOpacity(1.0)
+            item.setPen(QPen(Qt.PenStyle.NoPen))
         for item in self._reason_overlay_items.values():
             item.setVisible(False)
             item.setOpacity(1.0)
@@ -215,19 +232,38 @@ class HexBoardView(QGraphicsView):
             self.viewport().update()
             return
 
-        pen = QPen(
+        accent_pen = QPen(
             QColor(COLORS["reason_pinned"] if self._reason_pinned else COLORS["reason"]),
-            4.8 if self._reason_pinned else 4.2,
-            Qt.PenStyle.SolidLine if self._reason_pinned else Qt.PenStyle.DashLine,
+            3.0 if self._reason_pinned else 2.4,
+            Qt.PenStyle.SolidLine if self._reason_pinned else Qt.PenStyle.CustomDashLine,
             Qt.PenCapStyle.RoundCap,
             Qt.PenJoinStyle.RoundJoin,
         )
+        if not self._reason_pinned:
+            accent_pen.setDashPattern([1.8, 1.55])
+
+        halo_pen = QPen(
+            QColor(
+                COLORS[
+                    "reason_pinned_glow" if self._reason_pinned else "reason_glow"
+                ]
+            ),
+            7.2 if self._reason_pinned else 6.4,
+            Qt.PenStyle.SolidLine,
+            Qt.PenCapStyle.RoundCap,
+            Qt.PenJoinStyle.RoundJoin,
+        )
+        preview_halo_opacity = 0.10 if self._reason_animation_enabled else 0.30
         for coord in reference.coords:
+            halo_item = self._reason_halo_items.get(coord)
             item = self._reason_overlay_items.get(coord)
-            if item is None:
+            if halo_item is None or item is None:
                 continue
-            item.setPen(pen)
-            item.setOpacity(1.0 if self._reason_pinned else 0.78)
+            halo_item.setPen(halo_pen)
+            halo_item.setOpacity(0.38 if self._reason_pinned else preview_halo_opacity)
+            halo_item.setVisible(True)
+            item.setPen(accent_pen)
+            item.setOpacity(1.0 if self._reason_pinned else 0.94)
             item.setVisible(True)
 
         if reference.row_key is not None:
@@ -264,12 +300,16 @@ class HexBoardView(QGraphicsView):
         if self._reason_reference is None or self._reason_pinned:
             self._reason_animation_timer.stop()
             return
-        self._reason_animation_phase += 0.30
-        opacity = 0.78 + 0.10 * math.sin(self._reason_animation_phase)
+        self._reason_animation_elapsed_ms += self._reason_animation_timer.interval()
+        progress = min(1.0, self._reason_animation_elapsed_ms / 240.0)
+        eased = 1.0 - (1.0 - progress) ** 3
+        opacity = 0.10 + (0.30 - 0.10) * eased
         for coord in self._reason_reference.coords:
-            item = self._reason_overlay_items.get(coord)
+            item = self._reason_halo_items.get(coord)
             if item is not None and item.isVisible():
                 item.setOpacity(opacity)
+        if progress >= 1.0:
+            self._reason_animation_timer.stop()
         self.viewport().update()
 
     def sync_state(self) -> None:

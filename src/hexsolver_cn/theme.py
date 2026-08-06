@@ -20,9 +20,11 @@ COLORS = {
     "charcoal_hover": "#2F3134",
     "shadow": "#B8BBBC",
     "danger": "#D85D51",
-    "reason": "#167FA6",
+    "reason": "#0795CC",
+    "reason_glow": "#78D8EE",
     "reason_text": "#16708F",
-    "reason_pinned": "#0B6688",
+    "reason_pinned": "#075F82",
+    "reason_pinned_glow": "#31B4D8",
     "reason_soft": "#DDF1F7",
 }
 
