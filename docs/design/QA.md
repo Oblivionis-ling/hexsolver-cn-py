@@ -9,17 +9,17 @@
 
 - [`../images/hard-seed1.png`](../images/hard-seed1.png)：Hard seed 1，已修正棋盘方向和左右斜向标签。
 - [`../images/easy-seed1.png`](../images/easy-seed1.png)：Easy seed 1，226 格大盘与初始公开信息。
-- [`ui-v065-fullscreen-reason-bottom.png`](ui-v065-fullscreen-reason-bottom.png)：0.6.5 全屏类宽屏布局中，Hard seed 3 第 55 步滚动到推理末尾；默认未知按钮使用黑色选中轮廓。
-- [`ui-v065-settings-720x600.png`](ui-v065-settings-720x600.png)：0.6.5 鼠标操作与种子缓存设置页，逻辑尺寸 `720 × 600`；截图中原版式左右键操作已开启。
-- Implementation pixels: `2880 × 2048`.
-- Logical viewport: `1440 × 1024` at device pixel ratio `2.0`.
-- 仓库只保留当前 `0.6.5` 的应用界面截图；旧版布局截图已移除，演进过程保留在下方文字记录和开发历史中。
+- [`ui-v070-reason-row-linked.png`](ui-v070-reason-row-linked.png)：0.7.0 在 `1440 × 1024` Windows Qt 窗口中固定“D1 / 横向 / 长度 7”，文字加粗、外侧行线索变色且整行格子同步实线高亮。
+- [`ui-v070-reason-array-linked.png`](ui-v070-reason-array-linked.png)：0.7.0 固定同一理由中的长坐标数组，整段文字与全部数组成员作为一个组联动。
+- Implementation pixels: `1440 × 1024`.
+- Logical viewport: `1440 × 1024` at device pixel ratio `1.0`.
+- 仓库只保留当前 `0.7.0` 的应用界面截图；旧版布局截图已移除，演进过程保留在下方文字记录和开发历史中。
 
 **Normalized comparison**
 
 - 旧的并排比较图已经在 `0.6.4` 仓库整理时移除；仓库保留两张生成结果证据和两张当前应用界面截图。
-- The source was resampled to `1440 × 1024`; the implementation was downsampled from `2880 × 2048` to the same `1440 × 1024`. The two normalized frames were placed side by side in one `2880 × 1024` comparison image.
-- State: seed `00000001`, Easy selected, visible next-step target and explanation.
+- 早期方案对照曾把 source 与 implementation 归一化到 `1440 × 1024`；该并排图已按仓库整理规则移除，比较结论保留在下方历史中。
+- 当前两张 `0.7.0` 证据直接使用 `1440 × 1024` 真实 Windows Qt 画面，展示演示盘、完整解释以及两类固定引用状态。
 
 ## Findings
 
@@ -31,7 +31,7 @@ No actionable P0, P1, or P2 differences remain for the selected information arch
 - Image quality and asset fidelity: the selected design contains no photographic or illustrative raster assets. The board is implemented as interactive native geometry, not a placeholder image. General controls use the QtAwesome icon library; the numbered step marker is product data rendered in the same hexagonal grammar.
 - Copy and content: seed, difficulty, remaining count, manual states, action, coordinate, reason, runtime generation state, and failure recovery are coherent in standalone use. The full Chinese reason remains available through a substantially larger scrollable area at both tested window sizes, while the fixed action bar never overlaps the text viewport.
 - Icons and interaction states: copy, import, undo, reset, zoom, fit, settings, next, apply, selected difficulty, selected manual state, original-mouse toggle, and target-cell states are present and visually distinct.
-- Accessibility: controls use native Qt semantics and keyboard focus behavior, include tooltips, retain high-contrast active states, and use practical click targets. There is no continuous animation that requires reduced-motion handling.
+- Accessibility: controls use native Qt semantics and keyboard focus behavior, include tooltips, retain high-contrast active states, and use practical click targets. 推理引用既支持点击也支持 Enter/空格；悬停虚线的低幅呼吸在系统禁用控件动画或设置 `HEXSOLVER_REDUCED_MOTION=1` 时停用，固定态仍以实线和字重表达。
 
 The current Hard runtime capture now shows the same intended content class as the source: a wide irregular generated puzzle and `39` remaining. Easy was separately checked with a much denser 226-cell board; auto-fit keeps the complete puzzle and all line clues visible.
 
@@ -59,7 +59,7 @@ The current Hard runtime capture now shows the same intended content class as th
 
 - Earlier P2: the history trail used generic hex icons without step numbers and the rail was wider than the selected source.
 - Fix: add numbered hex step markers, center the manual-marking header, set the rail to `300` logical pixels, and tighten board-stage padding.
-- Post-fix evidence was superseded by the current `0.6.5` captures; the obsolete intermediate screenshot is no longer retained.
+- Post-fix evidence was later superseded by the then-current `0.6.5` captures; those captures were in turn replaced by the current `0.7.0` evidence.
 
 ## Follow-up polish
 
@@ -111,6 +111,14 @@ The current Hard runtime capture now shows the same intended content class as th
 - Added a settings card with an explicit checked button and status badge for the optional original-game mouse mapping: left-click excludes, right-click marks blue, and repeating the same button restores hidden.
 - The option persists through `QSettings`, defaults off for compatibility, disables the manual-state buttons while active, and is tested with real left/right viewport clicks.
 
+### Pass 10 (`0.7.0`)
+
+- 将 `QTextEdit` 封装为只读富文本浏览器，解释的 `toPlainText()`、换行、滚动和 28 px 文档尾距保持不变。
+- 坐标数组优先于单坐标解析，因此截图中的七个坐标只形成一个文字状态和一组棋盘状态；不存在于棋盘的坐标不会创建无效覆盖层。
+- 悬停引用使用青蓝虚线低幅呼吸，固定引用使用青蓝实线；覆盖层位于基础格子和目标/手动描边之外，不改填充含义。
+- 行引用除格子外同时强调外侧行线索；文字固定后用加粗和浅青底色表达，不只依赖颜色。
+- 两张截图均由真实 Windows Qt 平台抓取并人工检查；65 项源码回归和冻结成品冒烟覆盖解析、联动、固定、减少动态、清理及原文保持。
+
 ## Implementation checklist
 
 - [x] Selected direction 2 reproduced as a functional two-column desktop UI.
@@ -120,10 +128,11 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Hard seed 1 at `1440 × 1024` and `1120 × 760` passed visual inspection.
 - [x] Easy seed 1 dense-board capture passed visual inspection.
 - [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
-- [x] Fifty-six automated core, cache, bridge, solver and Qt workflow tests pass.
+- [x] Sixty-five automated core, cache, bridge, solver and Qt workflow tests pass.
 - [x] Full-screen long-reason bottom capture and end-cursor visibility check pass.
 - [x] Hidden, blue and excluded buttons render black, orange and blue active outlines respectively.
 - [x] Original-style mouse controls persist, map real left/right clicks, toggle back to unknown, and restore manual tools when disabled.
+- [x] Row names, individual coordinates and long coordinate arrays link to the correct board elements; hover, pin, keyboard activation and state cleanup pass.
 - [x] No actionable P0/P1/P2 visual findings remain.
 
 final result: passed

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 from typing import Dict, Optional
 
 from PySide6.QtCore import QPoint, QPointF, QRectF, Qt, QTimer, Signal
@@ -11,9 +12,11 @@ from PySide6.QtWidgets import (
     QGraphicsScene,
     QGraphicsSimpleTextItem,
     QGraphicsView,
+    QStyle,
 )
 
 from .models import Board, CellVisualType, Coord, LineFamily, SuggestedMove
+from .reason_interaction import ReasonReference, RowReferenceKey
 from .theme import COLORS
 
 
@@ -46,12 +49,26 @@ class HexBoardView(QGraphicsView):
         self._cell_items: Dict[Coord, QGraphicsPolygonItem] = {}
         self._cell_text_items: Dict[Coord, QGraphicsSimpleTextItem] = {}
         self._row_clue_items: list[QGraphicsSimpleTextItem] = []
+        self._row_clue_items_by_key: dict[RowReferenceKey, QGraphicsSimpleTextItem] = {}
+        self._reason_overlay_items: Dict[Coord, QGraphicsPolygonItem] = {}
+        self._reason_reference: Optional[ReasonReference] = None
+        self._reason_pinned = False
+        self._reason_animation_phase = 0.0
+        self._reason_animation_timer = QTimer(self)
+        self._reason_animation_timer.setInterval(80)
+        self._reason_animation_timer.timeout.connect(self._advance_reason_animation)
+        self._reason_animation_enabled = (
+            os.environ.get("HEXSOLVER_REDUCED_MOTION", "").strip().lower()
+            not in {"1", "true", "yes"}
+            and bool(self.style().styleHint(QStyle.StyleHint.SH_Widget_Animate, None, self))
+        )
         self._target: Optional[Coord] = None
         self._selected: Optional[Coord] = None
         self._pan_origin: Optional[QPoint] = None
         self._auto_fit = True
 
     def set_board(self, board: Board) -> None:
+        self.set_reason_reference(None)
         self.board = board
         self._target = None
         self._selected = None
@@ -64,6 +81,8 @@ class HexBoardView(QGraphicsView):
         self._cell_items.clear()
         self._cell_text_items.clear()
         self._row_clue_items.clear()
+        self._row_clue_items_by_key.clear()
+        self._reason_overlay_items.clear()
         if self.board is None:
             return
 
@@ -96,6 +115,17 @@ class HexBoardView(QGraphicsView):
             text.setData(0, cell.coord)
             self._cell_text_items[cell.coord] = text
             self._position_cell_text(cell.coord)
+
+            reason_overlay = QGraphicsPolygonItem(
+                self._polygon(cx, cy, self._radius + 4.0)
+            )
+            reason_overlay.setPen(QPen(Qt.PenStyle.NoPen))
+            reason_overlay.setBrush(Qt.BrushStyle.NoBrush)
+            reason_overlay.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+            reason_overlay.setVisible(False)
+            reason_overlay.setZValue(6)
+            self._scene.addItem(reason_overlay)
+            self._reason_overlay_items[cell.coord] = reason_overlay
 
         self._draw_row_clues()
         self._ensure_row_clues_visible()
@@ -130,6 +160,9 @@ class HexBoardView(QGraphicsView):
             text.setZValue(8)
             self._scene.addItem(text)
             self._row_clue_items.append(text)
+            self._row_clue_items_by_key[
+                RowReferenceKey(row.line_id, row.family, len(row.coords))
+            ] = text
 
     def _ensure_row_clues_visible(self) -> None:
         for item in self._row_clue_items:
@@ -140,6 +173,104 @@ class HexBoardView(QGraphicsView):
     @property
     def row_clue_items(self) -> tuple[QGraphicsSimpleTextItem, ...]:
         return tuple(self._row_clue_items)
+
+    @property
+    def reason_highlighted_coords(self) -> tuple[Coord, ...]:
+        return tuple(
+            coord for coord, item in self._reason_overlay_items.items() if item.isVisible()
+        )
+
+    @property
+    def reason_highlight_is_pinned(self) -> bool:
+        return self._reason_reference is not None and self._reason_pinned
+
+    @property
+    def reason_animation_active(self) -> bool:
+        return self._reason_animation_timer.isActive()
+
+    @property
+    def reason_highlighted_row(self) -> Optional[RowReferenceKey]:
+        if self._reason_reference is None:
+            return None
+        return self._reason_reference.row_key
+
+    def set_reason_reference(
+        self,
+        reference: Optional[ReasonReference],
+        *,
+        pinned: bool = False,
+    ) -> None:
+        self._reason_animation_timer.stop()
+        self._reason_reference = reference
+        self._reason_pinned = bool(reference is not None and pinned)
+        self._reason_animation_phase = 0.0
+
+        for item in self._reason_overlay_items.values():
+            item.setVisible(False)
+            item.setOpacity(1.0)
+            item.setPen(QPen(Qt.PenStyle.NoPen))
+        self._restore_row_clue_styles()
+
+        if reference is None:
+            self.viewport().update()
+            return
+
+        pen = QPen(
+            QColor(COLORS["reason_pinned"] if self._reason_pinned else COLORS["reason"]),
+            4.8 if self._reason_pinned else 4.2,
+            Qt.PenStyle.SolidLine if self._reason_pinned else Qt.PenStyle.DashLine,
+            Qt.PenCapStyle.RoundCap,
+            Qt.PenJoinStyle.RoundJoin,
+        )
+        for coord in reference.coords:
+            item = self._reason_overlay_items.get(coord)
+            if item is None:
+                continue
+            item.setPen(pen)
+            item.setOpacity(1.0 if self._reason_pinned else 0.78)
+            item.setVisible(True)
+
+        if reference.row_key is not None:
+            row_item = self._row_clue_items_by_key.get(reference.row_key)
+            if row_item is not None:
+                row_item.setBrush(
+                    QColor(
+                        COLORS["reason_pinned"]
+                        if self._reason_pinned
+                        else COLORS["reason"]
+                    )
+                )
+                font = row_item.font()
+                font.setWeight(
+                    QFont.Weight.Bold if self._reason_pinned else QFont.Weight.DemiBold
+                )
+                row_item.setFont(font)
+                row_item.setZValue(9)
+
+        if not self._reason_pinned and self._reason_animation_enabled:
+            self._reason_animation_timer.start()
+        self.viewport().update()
+
+    def _restore_row_clue_styles(self) -> None:
+        for item in self._row_clue_items:
+            item.setBrush(QColor(COLORS["text"]))
+            font = item.font()
+            font.setWeight(QFont.Weight.DemiBold)
+            item.setFont(font)
+            item.setOpacity(1.0)
+            item.setZValue(8)
+
+    def _advance_reason_animation(self) -> None:
+        if self._reason_reference is None or self._reason_pinned:
+            self._reason_animation_timer.stop()
+            return
+        self._reason_animation_phase += 0.30
+        opacity = 0.78 + 0.10 * math.sin(self._reason_animation_phase)
+        for coord in self._reason_reference.coords:
+            item = self._reason_overlay_items.get(coord)
+            if item is not None and item.isVisible():
+                item.setOpacity(opacity)
+        self.viewport().update()
 
     def sync_state(self) -> None:
         if self.board is None:

@@ -6,13 +6,14 @@ import traceback
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QColor, QTextCursor
+from PySide6.QtGui import QColor, QFont, QTextCursor
 from PySide6.QtWidgets import QApplication
 
 from .app import MainWindow, SCREENSHOT_IMPORT_ENABLED, STEP_REASON_BOTTOM_SAFE_MARGIN
 from .models import CellVisualType, MoveAction, SuggestedMove
 from .original_bridge import build_default_seed_registry
 from .preferences import AppPreferences
+from .reason_interaction import ReasonReferenceKind
 from .seed_workflow import Difficulty, SeedRequest
 from .settings_dialog import SettingsDialog
 from .theme import app_stylesheet
@@ -105,6 +106,65 @@ def _verify_manual_outline_colors(window: MainWindow, app: QApplication) -> None
     app.processEvents()
 
 
+def _verify_reason_interactions(window: MainWindow, app: QApplication) -> None:
+    row = window.session.board.row_clues[0]
+    coords = tuple(row.coords[: min(6, len(row.coords))])
+    coords_text = "[" + "、".join(f"({q}, {r})" for q, r in coords) + "]"
+    reason = (
+        "推理过程：\n"
+        f"1. 条件：{row.display_name()} 的提示 {row.clue_text}。\n"
+        f"2. 未知集合 A = {coords_text}。"
+    )
+    window._set_step_reason(reason)
+    app.processEvents()
+    if window.step_reason.toPlainText() != reason:
+        raise RuntimeError("交互推理文本改变了原始解释内容。")
+    row_reference = next(
+        (reference for reference in window.step_reason.references if reference.row_key),
+        None,
+    )
+    group_reference = next(
+        (
+            reference
+            for reference in window.step_reason.references
+            if reference.kind is ReasonReferenceKind.CELLS and len(reference.coords) > 1
+        ),
+        None,
+    )
+    if row_reference is None or group_reference is None:
+        raise RuntimeError("打包界面没有生成行线索和坐标组富文本引用。")
+
+    cursor = QTextCursor(window.step_reason.document())
+    cursor.setPosition(group_reference.start + 1)
+    if not cursor.charFormat().isAnchor():
+        raise RuntimeError("打包界面的坐标组没有渲染为可交互引用。")
+
+    window.step_reason.reference_focus_changed.emit(row_reference, False)
+    app.processEvents()
+    board_view = window.stage.board_view
+    if (
+        board_view.reason_highlighted_row != row_reference.row_key
+        or set(board_view.reason_highlighted_coords) != set(row_reference.coords)
+    ):
+        raise RuntimeError("行线索引用没有同步高亮棋盘行与覆盖格子。")
+
+    window.step_reason._toggle_reference(group_reference)
+    window.step_reason.reference_focus_changed.emit(group_reference, True)
+    app.processEvents()
+    cursor.setPosition(group_reference.start + 1)
+    if (
+        not board_view.reason_highlight_is_pinned
+        or set(board_view.reason_highlighted_coords) != set(group_reference.coords)
+        or cursor.charFormat().fontWeight() < QFont.Weight.Bold
+    ):
+        raise RuntimeError("坐标组引用没有固定棋盘高亮并加粗文字。")
+
+    window._update_step_card(None)
+    app.processEvents()
+    if window.step_reason.pinned_reference is not None or board_view.reason_highlighted_coords:
+        raise RuntimeError("切换推理原因后没有清理固定高亮。")
+
+
 def run_package_smoke_test() -> int:
     """Create the real UI and exercise both packaged generators, then exit."""
 
@@ -144,6 +204,7 @@ def run_package_smoke_test() -> int:
         if window.step_reason.geometry().bottom() >= window.step_action_bar.geometry().top():
             raise RuntimeError("打包界面的推理正文进入了底部按钮区域。")
         _verify_reason_bottom_safe_area(window, app)
+        _verify_reason_interactions(window, app)
         if any(button.size() != QSize(60, 56) for button in window.state_buttons.values()):
             raise RuntimeError("打包界面的手动标记图例没有缩小。")
         _verify_manual_outline_colors(window, app)

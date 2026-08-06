@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional
 
 import qtawesome as qta
 from PySide6.QtCore import QRegularExpression, QSize, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QRegularExpressionValidator
+from PySide6.QtGui import QFont, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QPushButton,
     QSizePolicy,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -29,6 +28,7 @@ from .demo_board import build_demo_board
 from .models import Board, CellVisualType, Coord, MoveAction, SuggestedMove
 from .original_bridge import build_default_seed_registry
 from .preferences import AppPreferences
+from .reason_interaction import InteractiveReasonBrowser, ReasonReference
 from .seed_workflow import Difficulty, SeedGeneratorRegistry, SeedRequest
 from .settings_dialog import SettingsDialog
 from .session import BoardStateError, InteractivePuzzleSession
@@ -364,9 +364,7 @@ class MainWindow(QMainWindow):
         heading.addWidget(self.step_coord)
         layout.addLayout(heading)
 
-        self.step_reason = QTextEdit()
-        self.step_reason.setReadOnly(True)
-        self.step_reason.setPlainText("手动同步到卡住的位置后，获取一个必然成立的步骤。")
+        self.step_reason = InteractiveReasonBrowser()
         self.step_reason.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.step_reason.setMinimumHeight(300)
         self.step_reason.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -374,9 +372,14 @@ class MainWindow(QMainWindow):
         self.step_reason.setViewportMargins(0, 0, 0, 0)
         self.step_reason.document().setDocumentMargin(2)
         self.step_reason.setStyleSheet(
-            f"QTextEdit {{ font-size: 13px; color: {COLORS['muted']}; background: {COLORS['panel']}; "
+            f"QTextBrowser {{ font-size: 13px; color: {COLORS['muted']}; background: {COLORS['panel']}; "
             "border: none; padding: 0 2px 0 0; }}"
         )
+        reason_font = QFont("Microsoft YaHei UI")
+        reason_font.setPixelSize(13)
+        self.step_reason.setFont(reason_font)
+        self.step_reason.document().setDefaultFont(reason_font)
+        self.step_reason.reference_focus_changed.connect(self._on_reason_reference_focus)
         layout.addWidget(self.step_reason, 1)
 
         self.step_action_bar = QWidget(panel)
@@ -688,13 +691,20 @@ class MainWindow(QMainWindow):
         self.apply_button.setEnabled(True)
 
     def _set_step_reason(self, text: str) -> None:
-        self.step_reason.setPlainText(text)
+        self.step_reason.set_reason(text, self.session.board)
         document = self.step_reason.document()
         root_frame = document.rootFrame()
         frame_format = root_frame.frameFormat()
         frame_format.setBottomMargin(STEP_REASON_BOTTOM_SAFE_MARGIN)
         root_frame.setFrameFormat(frame_format)
         self.step_reason.verticalScrollBar().setValue(0)
+
+    def _on_reason_reference_focus(
+        self,
+        reference: Optional[ReasonReference],
+        pinned: bool,
+    ) -> None:
+        self.stage.board_view.set_reason_reference(reference, pinned=pinned)
 
     def _update_counts(self) -> None:
         board = self.session.board

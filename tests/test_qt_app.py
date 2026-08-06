@@ -9,17 +9,22 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QPointF, QSettings, Qt  # noqa: E402
-from PySide6.QtGui import QColor, QTextCursor  # noqa: E402
+from PySide6.QtCore import QEvent, QPointF, QSettings, Qt  # noqa: E402
+from PySide6.QtGui import QColor, QFont, QTextCursor  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from hexsolver_cn.app import MainWindow, STEP_REASON_BOTTOM_SAFE_MARGIN  # noqa: E402
+from hexsolver_cn.board_view import HexBoardView  # noqa: E402
 from hexsolver_cn.models import CellVisualType, MoveAction, SuggestedMove  # noqa: E402
 from hexsolver_cn.original_bridge import (  # noqa: E402
     OriginalRuntimeHardBackend,
 )
 from hexsolver_cn.preferences import AppPreferences  # noqa: E402
+from hexsolver_cn.reason_interaction import (  # noqa: E402
+    ReasonReferenceKind,
+    parse_reason_references,
+)
 from hexsolver_cn.seed_cache import SeedResultCache  # noqa: E402
 from hexsolver_cn.seed_workflow import Difficulty, SeedGeneratorRegistry  # noqa: E402
 from hexsolver_cn.settings_dialog import SettingsDialog  # noqa: E402
@@ -52,6 +57,31 @@ class QtAppWorkflowTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.window.close()
         self.preferences_directory.cleanup()
+
+    def _activate_reason_reference(self, reference) -> None:  # type: ignore[no-untyped-def]
+        # Keyboard activation and mouse release share the same toggle path. The
+        # keyboard route is deterministic with Qt's offscreen font renderer and
+        # also verifies the required non-hover accessibility fallback.
+        cursor = QTextCursor(self.window.step_reason.document())
+        cursor.setPosition(reference.start + 1)
+        self.window.step_reason.setTextCursor(cursor)
+        QTest.keyClick(self.window.step_reason, Qt.Key.Key_Return)
+        self.app.processEvents()
+
+    def _click_reason_reference(self, reference) -> None:  # type: ignore[no-untyped-def]
+        # Qt's offscreen plugin does not always shape Chinese glyph positions
+        # before the first paint. Stub only hit-testing while keeping the real
+        # viewport press/release dispatch and browser mouse handlers intact.
+        with patch.object(
+            self.window.step_reason,
+            "_reference_at",
+            return_value=reference,
+        ):
+            QTest.mouseClick(
+                self.window.step_reason.viewport(),
+                Qt.MouseButton.LeftButton,
+            )
+        self.app.processEvents()
 
     def test_demo_board_can_suggest_and_apply_one_forced_move(self) -> None:
         self.window.solve_next_step()
@@ -177,6 +207,109 @@ class QtAppWorkflowTests(unittest.TestCase):
             self.window.step_reason.document().rootFrame().frameFormat().bottomMargin(),
             STEP_REASON_BOTTOM_SAFE_MARGIN,
         )
+
+    def test_reason_array_hover_highlights_every_related_cell_then_clears(self) -> None:
+        coords = tuple(list(self.window.session.board.cells)[:6])
+        coords_text = "[" + "、".join(f"({q}, {r})" for q, r in coords) + "]"
+        reason = f"推理过程：\n1. 未知集合 A = {coords_text}。"
+        self.window._set_step_reason(reason)
+        self.window.show()
+        self.app.processEvents()
+        reference = next(
+            item
+            for item in self.window.step_reason.references
+            if item.kind is ReasonReferenceKind.CELLS and len(item.coords) == len(coords)
+        )
+
+        position = self.window.step_reason.reference_cursor_rect(reference).center()
+        QTest.mouseMove(self.window.step_reason.viewport(), position)
+        self.app.processEvents()
+
+        self.assertEqual(set(coords), set(self.window.stage.board_view.reason_highlighted_coords))
+        self.assertFalse(self.window.stage.board_view.reason_highlight_is_pinned)
+        if self.window.stage.board_view._reason_animation_enabled:
+            self.assertTrue(self.window.stage.board_view.reason_animation_active)
+
+        leave = QEvent(QEvent.Type.Leave)
+        QApplication.sendEvent(self.window.step_reason, leave)
+        self.app.processEvents()
+        self.assertEqual((), self.window.stage.board_view.reason_highlighted_coords)
+
+    def test_reduced_motion_disables_reason_pulse_but_keeps_static_outline(self) -> None:
+        board = self.window.session.board
+        coord = next(iter(board.cells))
+        reference = parse_reason_references(f"格子 ({coord[0]}, {coord[1]})", board)[0]
+
+        with patch.dict(os.environ, {"HEXSOLVER_REDUCED_MOTION": "1"}):
+            view = HexBoardView()
+        view.set_board(board)
+        view.set_reason_reference(reference)
+
+        self.assertEqual((coord,), view.reason_highlighted_coords)
+        self.assertFalse(view.reason_animation_active)
+        view.deleteLater()
+
+    def test_row_reference_hover_highlights_row_clue_and_covered_cells(self) -> None:
+        row = self.window.session.board.row_clues[0]
+        reason = f"推理过程：\n1. 条件：{row.display_name()} 的提示 {row.clue_text}。"
+        self.window._set_step_reason(reason)
+        self.window.show()
+        self.app.processEvents()
+        reference = next(
+            item for item in self.window.step_reason.references if item.row_key is not None
+        )
+
+        QTest.mouseMove(
+            self.window.step_reason.viewport(),
+            self.window.step_reason.reference_cursor_rect(reference).center(),
+        )
+        self.app.processEvents()
+
+        self.assertEqual(reference.row_key, self.window.stage.board_view.reason_highlighted_row)
+        self.assertEqual(set(row.coords), set(self.window.stage.board_view.reason_highlighted_coords))
+
+    def test_click_pins_bold_reference_and_second_click_unpins_it(self) -> None:
+        coord = next(iter(self.window.session.board.cells))
+        reason = f"结论：格子 ({coord[0]}, {coord[1]}) 必须判蓝。"
+        self.window._set_step_reason(reason)
+        self.window.show()
+        self.app.processEvents()
+        reference = self.window.step_reason.references[0]
+        self._click_reason_reference(reference)
+        QApplication.sendEvent(self.window.step_reason, QEvent(QEvent.Type.Leave))
+        self.app.processEvents()
+
+        cursor = QTextCursor(self.window.step_reason.document())
+        cursor.setPosition(reference.start + 1)
+        self.assertEqual(reference, self.window.step_reason.pinned_reference)
+        self.assertGreaterEqual(cursor.charFormat().fontWeight(), QFont.Weight.Bold)
+        self.assertEqual((coord,), self.window.stage.board_view.reason_highlighted_coords)
+        self.assertTrue(self.window.stage.board_view.reason_highlight_is_pinned)
+
+        self._click_reason_reference(reference)
+        QApplication.sendEvent(self.window.step_reason, QEvent(QEvent.Type.Leave))
+        self.app.processEvents()
+
+        self.assertIsNone(self.window.step_reason.pinned_reference)
+        self.assertEqual((), self.window.stage.board_view.reason_highlighted_coords)
+
+    def test_new_reason_clears_pinned_reference_without_changing_plain_text(self) -> None:
+        coord = next(iter(self.window.session.board.cells))
+        reason = f"格子 ({coord[0]}, {coord[1]}) 必须判蓝。"
+        self.window._set_step_reason(reason)
+        self.window.show()
+        self.app.processEvents()
+        reference = self.window.step_reason.references[0]
+        self._activate_reason_reference(reference)
+        self.assertIsNotNone(self.window.step_reason.pinned_reference)
+
+        replacement = "手动同步到卡住的位置后，获取一个必然成立的步骤。"
+        self.window._set_step_reason(replacement)
+        self.app.processEvents()
+
+        self.assertEqual(replacement, self.window.step_reason.toPlainText())
+        self.assertIsNone(self.window.step_reason.pinned_reference)
+        self.assertEqual((), self.window.stage.board_view.reason_highlighted_coords)
 
     def test_screenshot_import_is_disabled_in_ui_and_guarded_in_handler(self) -> None:
         board_before = self.window.session.board
