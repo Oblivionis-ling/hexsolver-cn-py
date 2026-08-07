@@ -2,16 +2,16 @@
 
 ## 目标
 
-`0.7.2` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享同一套版本化种子缓存实现。本版把逐步推理改为严格的全场难度分层短路；UI、地图生成、缓存和解释模板保持不变。
+`0.7.3` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享同一套版本化种子缓存实现。本版只调整启动窗口、设置页、空盘状态和四步使用说明；求解、地图生成、缓存和解释模板保持不变。
 
 发布资产：
 
 ```text
-HexInfiniteSolver-0.7.2-windows-x64.exe
-HexInfiniteSolver-0.7.2-windows-x64.exe.sha256
+HexInfiniteSolver-0.7.3-windows-x64.exe
+HexInfiniteSolver-0.7.3-windows-x64.exe.sha256
 ```
 
-2026-08-07 已验证 `0.7.2` 发布成品：96,501,119 字节（92.03 MiB），SHA-256 为 `0ee95231593f1d7b3be63cad51076c2d37718048f19bec87db1bee6f6b758741`。Windows 版本资源中的 FileVersion 和 ProductVersion 均为 `0.7.2`。
+2026-08-07 已验证 `0.7.3` 发布成品：96,512,704 字节（92.04 MiB），SHA-256 为 `baf45bf71b9c556a3c1734ce480168c98e7e487a939dcc1dbc635c22a2f8ead1`。Windows 版本资源中的 FileVersion 和 ProductVersion 均为 `0.7.3`。
 
 ## 成品包含什么
 
@@ -22,7 +22,7 @@ HexInfiniteSolver-0.7.2-windows-x64.exe.sha256
 - Qt 插件、字体图标、应用图标和 Windows 版本资源。
 - 种子缓存、用户体验偏好与设置页；缓存数据和 Qt 用户设置在运行时写入用户目录，不会预置在 EXE 中。
 
-截图入口当前关闭，因此 0.7.2 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
+截图入口当前关闭，因此 0.7.3 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
 
 ## 成品不包含什么
 
@@ -57,7 +57,9 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 `--package-smoke-test` 不是“能启动进程就算通过”，而是由冻结后的应用自身：
 
 - 创建真实 `QApplication` 和 `MainWindow`；
-- 核对窗口标题、最小尺寸、默认尺寸、300 px 侧栏和截图入口关闭状态；
+- 核对窗口标题、最小尺寸、默认尺寸、300 px 侧栏、截图入口关闭状态和默认有窗口最大化；
+- 核对启动盘面为空、四步手绘使用说明与关闭入口存在，并确认盘面操作在说明显示期间禁用；
+- 核对“应用当前建议”按钮没有悬停提示框但保留无障碍名称；
 - 核对步骤历史和重复统计控件已移除、推理原因区域获得预期高度；
 - 核对推理正文严格位于固定按钮栏上方，并且手动标记图例采用紧凑尺寸；
 - 依次点击未知、蓝格、排除按钮，核对互斥选中状态以及黑、橘、蓝三种轮廓的实际渲染像素；
@@ -65,7 +67,8 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 - 写入 80 行合成长解释、滚动到末尾，并直接检查末尾光标完整位于文本视口内且具有 28 px 根帧安全尾距；
 - 生成行名称与坐标组富文本引用，核对解释原文不变、锚点存在且无悬停提示框、行线索与双层覆盖同步高亮、预览/固定分别使用虚线/实线、点击固定后文字加粗，并确认换理由会清理固定状态；
 - 核对全部行线索存在、可见并位于棋盘格上层；
-- 核对右下角设置入口可访问，设置页显示真实缓存目录和鼠标操作开关；
+- 核对右下角设置入口可访问，设置页显示真实缓存目录、三种启动窗口模式、使用说明入口和鼠标操作开关；
+- 持久化切换启动窗口模式，重新打开说明，并在装载真实 Hard seed 1 后确认说明自动收起、棋盘操作恢复；
 - 核对单文件内的三个 Easy 托管宿主文件；
 - 生成 Easy seed 1，并核对第一条建议与私有答案，再次请求并确认命中缓存；
 - 生成 Hard seed 1，并核对第一条建议与私有答案，再次请求并确认命中缓存；

@@ -9,13 +9,19 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QColor, QFont, QTextCursor
 from PySide6.QtWidgets import QApplication
 
-from .app import MainWindow, SCREENSHOT_IMPORT_ENABLED, STEP_REASON_BOTTOM_SAFE_MARGIN
+from .app import (
+    MainWindow,
+    SCREENSHOT_IMPORT_ENABLED,
+    STEP_REASON_BOTTOM_SAFE_MARGIN,
+    show_window_for_startup,
+)
 from .models import CellVisualType, MoveAction, SuggestedMove
 from .original_bridge import build_default_seed_registry
-from .preferences import AppPreferences
+from .preferences import AppPreferences, StartupWindowMode
 from .reason_interaction import ReasonReferenceKind
 from .seed_workflow import Difficulty, SeedRequest
 from .settings_dialog import SettingsDialog
+from .session import InteractivePuzzleSession
 from .theme import app_stylesheet
 
 
@@ -198,14 +204,31 @@ def run_package_smoke_test() -> int:
         preferences = AppPreferences(persistent=False)
         window = MainWindow(seed_generators=registry, preferences=preferences)
         _write_progress("window-created")
-        window.show()
+        if window.minimumSize() != QSize(1120, 760) or window.size() != QSize(1440, 1024):
+            raise RuntimeError("打包窗口初始尺寸与源码版不一致。")
+        if preferences.startup_window_mode is not StartupWindowMode.MAXIMIZED:
+            raise RuntimeError("打包版没有默认使用有窗口最大化启动模式。")
+        show_window_for_startup(window, preferences.startup_window_mode)
         app.processEvents()
         _write_progress("window-shown")
 
         if window.windowTitle() != "HexInfinite 种子求解器":
             raise RuntimeError("打包窗口标题与源码版不一致。")
-        if window.minimumSize() != QSize(1120, 760) or window.size() != QSize(1440, 1024):
-            raise RuntimeError("打包窗口尺寸与源码版不一致。")
+        if not window.isMaximized():
+            raise RuntimeError("打包版没有按默认设置最大化窗口。")
+        if window.session.board.cells or not window._guide_visible:
+            raise RuntimeError("打包版启动时仍显示模拟盘面，或没有显示使用说明。")
+        if (
+            not window.onboarding_overlay.isVisible()
+            or len(window.onboarding_overlay.notes) != 4
+            or not window.guide_close_button.isVisible()
+        ):
+            raise RuntimeError("打包版缺少四步手绘使用说明或关闭入口。")
+        if window.apply_button.toolTip() or not window.apply_button.accessibleName():
+            raise RuntimeError("应用建议按钮仍显示悬停弹窗，或缺少无障碍名称。")
+        window.showNormal()
+        window.resize(1440, 1024)
+        app.processEvents()
         if window.sidebar.width() != 300:
             raise RuntimeError("打包侧栏宽度与源码版不一致。")
         if any(
@@ -218,15 +241,8 @@ def run_package_smoke_test() -> int:
         if window.step_reason.geometry().bottom() >= window.step_action_bar.geometry().top():
             raise RuntimeError("打包界面的推理正文进入了底部按钮区域。")
         _verify_reason_bottom_safe_area(window, app)
-        _verify_reason_interactions(window, app)
         if any(button.size() != QSize(60, 56) for button in window.state_buttons.values()):
             raise RuntimeError("打包界面的手动标记图例没有缩小。")
-        _verify_manual_outline_colors(window, app)
-        row_items = window.stage.board_view.row_clue_items
-        if len(row_items) != len(window.session.board.row_clues) or not all(
-            item.isVisible() and item.zValue() > 4 for item in row_items
-        ):
-            raise RuntimeError("打包界面没有保持所有行线索可见。")
         if SCREENSHOT_IMPORT_ENABLED or window.stage.import_button.isEnabled():
             raise RuntimeError("打包版意外启用了尚未开放的截图入口。")
         if (
@@ -239,6 +255,57 @@ def run_package_smoke_test() -> int:
             registry.cache.directory
         ):
             raise RuntimeError("设置页没有显示实际种子缓存位置。")
+        if (
+            settings.startup_mode_combo.currentData()
+            != StartupWindowMode.MAXIMIZED.value
+        ):
+            raise RuntimeError("设置页没有显示默认的有窗口最大化启动模式。")
+        fullscreen_index = settings.startup_mode_combo.findData(
+            StartupWindowMode.FULLSCREEN.value
+        )
+        settings.startup_mode_combo.setCurrentIndex(fullscreen_index)
+        app.processEvents()
+        if preferences.startup_window_mode is not StartupWindowMode.FULLSCREEN:
+            raise RuntimeError("设置页没有保存无边框全屏启动模式。")
+        maximized_index = settings.startup_mode_combo.findData(
+            StartupWindowMode.MAXIMIZED.value
+        )
+        settings.startup_mode_combo.setCurrentIndex(maximized_index)
+        if not settings.show_guide_button.accessibleName():
+            raise RuntimeError("设置页缺少重新查看使用说明的可访问入口。")
+        settings.show_guide_button.click()
+        if not settings.guide_requested:
+            raise RuntimeError("设置页没有发出重新查看使用说明的请求。")
+        window.show_onboarding()
+        app.processEvents()
+        if not window._guide_visible or window.next_button.isEnabled():
+            raise RuntimeError("重新打开使用说明时没有暂停棋盘操作。")
+        settings.close()
+
+        preview = registry.generate(SeedRequest(seed=1, difficulty=Difficulty.HARD))
+        window.current_seed = preview.request
+        window.session = InteractivePuzzleSession(
+            preview.public_board,
+            window.solver,
+            private_reveals=preview.private_reveals,
+        )
+        window._load_board(
+            window.session.board,
+            mode_text="种子 00000001 · 困难 · 成品验证",
+            verified=True,
+        )
+        app.processEvents()
+        if window._guide_visible or not window.next_button.isEnabled():
+            raise RuntimeError("生成真实种子盘面后使用说明没有自动收起。")
+        _verify_manual_outline_colors(window, app)
+        row_items = window.stage.board_view.row_clue_items
+        if len(row_items) != len(window.session.board.row_clues) or not all(
+            item.isVisible() and item.zValue() > 4 for item in row_items
+        ):
+            raise RuntimeError("打包界面没有保持所有行线索可见。")
+        _verify_reason_interactions(window, app)
+
+        settings = SettingsDialog(registry.cache, preferences, window)
         if settings.original_mouse_controls_toggle.isChecked():
             raise RuntimeError("原版鼠标操作没有保持兼容性的默认关闭状态。")
         settings.original_mouse_controls_toggle.click()

@@ -24,10 +24,10 @@ from PySide6.QtWidgets import (
 )
 
 from .board_view import HexBoardView
-from .demo_board import build_demo_board
 from .models import Board, CellVisualType, Coord, MoveAction, SuggestedMove
+from .onboarding import GuideTarget, OnboardingOverlay
 from .original_bridge import build_default_seed_registry
-from .preferences import AppPreferences
+from .preferences import AppPreferences, StartupWindowMode
 from .reason_interaction import InteractiveReasonBrowser, ReasonReference
 from .seed_workflow import Difficulty, SeedGeneratorRegistry, SeedRequest
 from .settings_dialog import SettingsDialog
@@ -43,6 +43,30 @@ if TYPE_CHECKING:
 
 SCREENSHOT_IMPORT_ENABLED = False
 STEP_REASON_BOTTOM_SAFE_MARGIN = 28.0
+
+
+def build_empty_board() -> Board:
+    return Board(
+        image_path="",
+        image_size=(1100, 900),
+        cells={},
+        row_clues=[],
+        origin=(0.0, 0.0),
+        basis_a=(48.0, 0.0),
+        basis_b=(24.0, 42.0),
+        ring_threshold=18.0,
+        logs=["尚未生成种子盘面。"],
+        remaining_blue=None,
+    )
+
+
+def show_window_for_startup(window: QMainWindow, mode: StartupWindowMode) -> None:
+    if mode is StartupWindowMode.FULLSCREEN:
+        window.showFullScreen()
+    elif mode is StartupWindowMode.NORMAL:
+        window.showNormal()
+    else:
+        window.showMaximized()
 
 
 class SeedGenerationThread(QThread):
@@ -78,7 +102,7 @@ class BoardStage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.board_view)
 
-        self.mode_chip = QLabel("界面演示盘 · 非种子生成结果", self)
+        self.mode_chip = QLabel("快速上手 · 尚未生成地图", self)
         self.mode_chip.setStyleSheet(
             f"background: rgba(255,255,255,220); color: {COLORS['muted']}; "
             f"border: 1px solid {COLORS['border']}; border-radius: 4px; padding: 7px 11px;"
@@ -192,17 +216,19 @@ class MainWindow(QMainWindow):
         self.solver = HexReasoningSolver()
         self.seed_generators = seed_generators or build_default_seed_registry()
         self.preferences = preferences or AppPreferences()
-        self.session = InteractivePuzzleSession(build_demo_board(), self.solver)
+        self.session = InteractivePuzzleSession(build_empty_board(), self.solver)
         self.current_move: Optional[SuggestedMove] = None
         self.current_seed: Optional[SeedRequest] = None
         self.selected_state = CellVisualType.HIDDEN
+        self._has_active_board = False
+        self._guide_visible = False
         self._detector: Optional["HexImageDetector"] = None
         self._generation_thread: Optional[SeedGenerationThread] = None
 
-        root = QWidget()
-        root.setObjectName("AppRoot")
-        self.setCentralWidget(root)
-        root_layout = QHBoxLayout(root)
+        self.root = QWidget()
+        self.root.setObjectName("AppRoot")
+        self.setCentralWidget(self.root)
+        root_layout = QHBoxLayout(self.root)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
@@ -227,8 +253,55 @@ class MainWindow(QMainWindow):
         self.stage.import_button.clicked.connect(self.import_screenshot)
         self.stage.settings_button.clicked.connect(self.open_settings)
 
+        self.onboarding_overlay = OnboardingOverlay(
+            self.stage,
+            (
+                GuideTarget(
+                    "输入种子、选择难度，然后生成真实盘面。",
+                    self.seed_panel,
+                    COLORS["orange"],
+                ),
+                GuideTarget(
+                    "按游戏当前进度同步蓝格与排除格。",
+                    self.manual_panel,
+                    COLORS["blue"],
+                ),
+                GuideTarget(
+                    "卡住时计算下一步，并阅读完整推理理由。",
+                    self.next_button,
+                    COLORS["blue_hover"],
+                ),
+                GuideTarget(
+                    "在设置中调整启动方式、鼠标操作或重看说明。",
+                    self.stage.settings_button,
+                    COLORS["orange_hover"],
+                ),
+            ),
+            self.root,
+        )
+        self.guide_close_button = QPushButton("关闭说明", self.root)
+        self.guide_close_button.setObjectName("GuideCloseButton")
+        self.guide_close_button.setIcon(qta.icon("fa5s.times", color=COLORS["white"]))
+        self.guide_close_button.setAccessibleName("关闭使用说明")
+        self.guide_close_button.setAccessibleDescription(
+            "关闭当前使用说明；可稍后从设置中重新打开"
+        )
+        self.guide_close_button.setFixedSize(112, 42)
+        self.guide_close_button.setStyleSheet(
+            self._primary_button_style(
+                COLORS["charcoal"], COLORS["charcoal_hover"], 40, 13
+            )
+        )
+        self.guide_close_button.clicked.connect(self.hide_onboarding)
+
         self._apply_mouse_control_preference()
-        self._load_board(self.session.board, mode_text="界面演示盘 · 非种子生成结果")
+        self._load_board(
+            self.session.board,
+            mode_text="快速上手 · 尚未生成地图",
+            active=False,
+            close_guide=False,
+        )
+        self.show_onboarding()
 
     def _build_sidebar(self) -> QWidget:
         sidebar = QWidget()
@@ -238,8 +311,10 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(15, 18, 15, 14)
         layout.setSpacing(9)
 
-        layout.addWidget(self._build_seed_panel())
-        layout.addWidget(self._build_manual_panel())
+        self.seed_panel = self._build_seed_panel()
+        layout.addWidget(self.seed_panel)
+        self.manual_panel = self._build_manual_panel()
+        layout.addWidget(self.manual_panel)
         self.step_panel = self._build_step_panel()
         layout.addWidget(self.step_panel, 1)
         return sidebar
@@ -403,7 +478,8 @@ class MainWindow(QMainWindow):
         self.apply_button.setIcon(qta.icon("fa5s.check", color=COLORS["white"]))
         self.apply_button.setIconSize(QSize(16, 16))
         self.apply_button.setStyleSheet(self._primary_button_style(COLORS["blue"], COLORS["blue_hover"], 38, 14))
-        self.apply_button.setToolTip("把建议应用到本地盘面")
+        self.apply_button.setAccessibleName("应用当前建议")
+        self.apply_button.setAccessibleDescription("把当前建议直接应用到本地盘面")
         self.apply_button.setFixedSize(42, 38)
         self.apply_button.clicked.connect(self.apply_current_move)
         self.apply_button.setEnabled(False)
@@ -450,8 +526,9 @@ class MainWindow(QMainWindow):
 
     def _apply_mouse_control_preference(self) -> None:
         enabled = self.preferences.original_mouse_controls_enabled
+        board_interaction_enabled = self._has_active_board and not self._guide_visible
         for button in self.state_buttons.values():
-            button.setEnabled(not enabled)
+            button.setEnabled(board_interaction_enabled and not enabled)
             button.setToolTip(
                 "原版鼠标操作已开启：左键排除，右键蓝色"
                 if enabled
@@ -463,13 +540,72 @@ class MainWindow(QMainWindow):
             help_text = "选择状态后，左键点击右侧棋盘同步游戏进度"
         self.manual_help_button.setToolTip(help_text)
         self.manual_help_button.setAccessibleDescription(help_text)
+        self.manual_help_button.setEnabled(board_interaction_enabled)
 
-    def _load_board(self, board: Board, *, mode_text: str, verified: bool = False) -> None:
+    def _load_board(
+        self,
+        board: Board,
+        *,
+        mode_text: str,
+        verified: bool = False,
+        active: bool = True,
+        close_guide: bool = True,
+    ) -> None:
+        self._has_active_board = active
         self.stage.board_view.set_board(board)
         self.stage.set_mode(mode_text, verified=verified)
         self.current_move = None
         self._update_step_card(None)
         self._update_counts()
+        if close_guide:
+            self.hide_onboarding()
+        else:
+            self._refresh_board_interactions()
+
+    def show_onboarding(self) -> None:
+        self._guide_visible = True
+        self.onboarding_overlay.setGeometry(self.root.rect())
+        self.onboarding_overlay.show()
+        self.onboarding_overlay.raise_()
+        self.guide_close_button.show()
+        self._position_guide_close_button()
+        self.guide_close_button.raise_()
+        self._refresh_board_interactions()
+
+    def hide_onboarding(self) -> None:
+        self._guide_visible = False
+        self.onboarding_overlay.hide()
+        self.guide_close_button.hide()
+        self._refresh_board_interactions()
+
+    def _position_guide_close_button(self) -> None:
+        margin = 24
+        self.guide_close_button.move(
+            self.root.width() - self.guide_close_button.width() - margin,
+            margin,
+        )
+
+    def _refresh_board_interactions(self) -> None:
+        enabled = self._has_active_board and not self._guide_visible
+        self.stage.board_view.setEnabled(enabled)
+        for button in (
+            self.stage.undo_button,
+            self.stage.reset_button,
+            self.stage.zoom_out_button,
+            self.stage.zoom_in_button,
+            self.stage.fit_button,
+        ):
+            button.setEnabled(enabled)
+        self.next_button.setEnabled(enabled)
+        self.apply_button.setEnabled(enabled and self.current_move is not None)
+        self.stage.counter_badge.setVisible(enabled)
+        self._apply_mouse_control_preference()
+
+    def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().resizeEvent(event)
+        if hasattr(self, "onboarding_overlay"):
+            self.onboarding_overlay.setGeometry(self.root.rect())
+            self._position_guide_close_button()
 
     def _on_cell_activated(
         self,
@@ -672,6 +808,8 @@ class MainWindow(QMainWindow):
         dialog = SettingsDialog(self.seed_generators.cache, self.preferences, self)
         dialog.exec()
         self._apply_mouse_control_preference()
+        if dialog.guide_requested:
+            self.show_onboarding()
 
     def copy_seed(self) -> None:
         QApplication.clipboard().setText(self.seed_input.text())
@@ -688,7 +826,7 @@ class MainWindow(QMainWindow):
         self.step_title.setText(action)
         self.step_coord.setText(str(move.coord))
         self._set_step_reason(move.reason)
-        self.apply_button.setEnabled(True)
+        self.apply_button.setEnabled(self._has_active_board and not self._guide_visible)
 
     def _set_step_reason(self, text: str) -> None:
         self.step_reason.set_reason(text, self.session.board)
@@ -728,6 +866,7 @@ def run_app() -> None:
     app.setOrganizationName("HexInfinite Solver")
     app.setStyle("Fusion")
     app.setStyleSheet(app_stylesheet())
-    window = MainWindow()
-    window.show()
+    preferences = AppPreferences()
+    window = MainWindow(preferences=preferences)
+    show_window_for_startup(window, preferences.startup_window_mode)
     app.exec()
