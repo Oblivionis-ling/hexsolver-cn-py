@@ -14,13 +14,18 @@ from PySide6.QtGui import QColor, QFont, QTextCursor  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
-from hexsolver_cn.app import MainWindow, STEP_REASON_BOTTOM_SAFE_MARGIN  # noqa: E402
+from hexsolver_cn.app import (  # noqa: E402
+    MainWindow,
+    STEP_REASON_BOTTOM_SAFE_MARGIN,
+    show_window_for_startup,
+)
 from hexsolver_cn.board_view import HexBoardView  # noqa: E402
+from hexsolver_cn.demo_board import build_demo_board  # noqa: E402
 from hexsolver_cn.models import CellVisualType, MoveAction, SuggestedMove  # noqa: E402
 from hexsolver_cn.original_bridge import (  # noqa: E402
     OriginalRuntimeHardBackend,
 )
-from hexsolver_cn.preferences import AppPreferences  # noqa: E402
+from hexsolver_cn.preferences import AppPreferences, StartupWindowMode  # noqa: E402
 from hexsolver_cn.reason_interaction import (  # noqa: E402
     ReasonReferenceKind,
     parse_reason_references,
@@ -28,6 +33,7 @@ from hexsolver_cn.reason_interaction import (  # noqa: E402
 from hexsolver_cn.seed_cache import SeedResultCache  # noqa: E402
 from hexsolver_cn.seed_workflow import Difficulty, SeedGeneratorRegistry  # noqa: E402
 from hexsolver_cn.settings_dialog import SettingsDialog  # noqa: E402
+from hexsolver_cn.session import InteractivePuzzleSession  # noqa: E402
 
 
 class FixtureRunner:
@@ -52,6 +58,15 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.window = MainWindow(
             seed_generators=SeedGeneratorRegistry(),
             preferences=self.preferences,
+        )
+        self.window.session = InteractivePuzzleSession(
+            build_demo_board(),
+            self.window.solver,
+        )
+        self.window._load_board(
+            self.window.session.board,
+            mode_text="测试盘面",
+            verified=True,
         )
 
     def tearDown(self) -> None:
@@ -84,6 +99,8 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.app.processEvents()
 
     def test_demo_board_can_suggest_and_apply_one_forced_move(self) -> None:
+        self.assertEqual("", self.window.apply_button.toolTip())
+        self.assertEqual("应用当前建议", self.window.apply_button.accessibleName())
         self.window.solve_next_step()
         move = self.window.current_move
         self.assertIsNotNone(move)
@@ -97,6 +114,72 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.assertIn(after, {CellVisualType.BLUE, CellVisualType.BLACK})
         self.assertIsNone(self.window.current_move)
         self.assertEqual(move.coord, self.window.session.history[-1].coord)
+
+    def test_fresh_window_uses_guide_instead_of_demo_board(self) -> None:
+        fresh = MainWindow(
+            seed_generators=SeedGeneratorRegistry(),
+            preferences=self.preferences,
+        )
+        fresh.show()
+        self.app.processEvents()
+        try:
+            self.assertEqual({}, fresh.session.board.cells)
+            self.assertEqual((), fresh.stage.board_view.row_clue_items)
+            self.assertTrue(fresh._guide_visible)
+            self.assertTrue(fresh.onboarding_overlay.isVisible())
+            self.assertTrue(fresh.guide_close_button.isVisible())
+            self.assertIn("尚未生成地图", fresh.stage.mode_chip.text())
+            self.assertFalse(fresh.next_button.isEnabled())
+            self.assertFalse(fresh.stage.board_view.isEnabled())
+            self.assertFalse(fresh.stage.counter_badge.isVisible())
+            self.assertEqual(4, len(fresh.onboarding_overlay.notes))
+            self.assertTrue(
+                all(note.accessibleName() for note in fresh.onboarding_overlay.notes)
+            )
+
+            fresh._load_board(build_demo_board(), mode_text="真实盘面", verified=True)
+            self.app.processEvents()
+            self.assertFalse(fresh._guide_visible)
+            self.assertFalse(fresh.onboarding_overlay.isVisible())
+            self.assertTrue(fresh.next_button.isEnabled())
+            self.assertTrue(fresh.stage.board_view.isEnabled())
+
+            fresh.show_onboarding()
+            self.assertTrue(fresh._guide_visible)
+            self.assertFalse(fresh.next_button.isEnabled())
+            fresh.hide_onboarding()
+            self.assertTrue(fresh.next_button.isEnabled())
+        finally:
+            fresh.close()
+
+    def test_startup_window_mode_defaults_to_maximized_and_dispatches_all_modes(self) -> None:
+        self.assertIs(
+            StartupWindowMode.MAXIMIZED,
+            self.preferences.startup_window_mode,
+        )
+
+        class WindowRecorder:
+            def __init__(self) -> None:
+                self.calls: list[str] = []
+
+            def showMaximized(self) -> None:
+                self.calls.append("maximized")
+
+            def showFullScreen(self) -> None:
+                self.calls.append("fullscreen")
+
+            def showNormal(self) -> None:
+                self.calls.append("normal")
+
+        expected = {
+            StartupWindowMode.MAXIMIZED: "maximized",
+            StartupWindowMode.FULLSCREEN: "fullscreen",
+            StartupWindowMode.NORMAL: "normal",
+        }
+        for mode, call in expected.items():
+            recorder = WindowRecorder()
+            show_window_for_startup(recorder, mode)  # type: ignore[arg-type]
+            self.assertEqual([call], recorder.calls)
 
     def test_sidebar_removes_secondary_panels_and_prioritizes_reason_panel(self) -> None:
         self.window.show()
@@ -389,6 +472,11 @@ class QtAppWorkflowTests(unittest.TestCase):
                 "删除全部种子结果缓存",
                 dialog.clear_cache_button.accessibleName(),
             )
+            self.assertEqual(
+                StartupWindowMode.MAXIMIZED.value,
+                dialog.startup_mode_combo.currentData(),
+            )
+            self.assertEqual("重新查看使用说明", dialog.show_guide_button.accessibleName())
 
             with patch(
                 "hexsolver_cn.settings_dialog.QMessageBox.question",
@@ -401,6 +489,45 @@ class QtAppWorkflowTests(unittest.TestCase):
             self.assertFalse(dialog.clear_cache_button.isEnabled())
             self.assertIn("已删除", dialog.feedback_label.text())
             dialog.close()
+
+    def test_startup_mode_and_guide_request_are_persisted_and_exposed(self) -> None:
+        dialog = SettingsDialog(None, self.preferences, self.window)
+        dialog.show()
+        self.app.processEvents()
+
+        fullscreen_index = dialog.startup_mode_combo.findData(
+            StartupWindowMode.FULLSCREEN.value
+        )
+        dialog.startup_mode_combo.setCurrentIndex(fullscreen_index)
+        self.app.processEvents()
+
+        self.assertIs(
+            StartupWindowMode.FULLSCREEN,
+            self.preferences.startup_window_mode,
+        )
+        reloaded = AppPreferences(
+            QSettings(str(self.preferences_path), QSettings.Format.IniFormat)
+        )
+        self.assertIs(StartupWindowMode.FULLSCREEN, reloaded.startup_window_mode)
+        self.assertIn("下次启动", dialog.feedback_label.text())
+
+        dialog.show_guide_button.click()
+        self.app.processEvents()
+        self.assertTrue(dialog.guide_requested)
+
+    def test_settings_guide_request_reopens_onboarding_in_main_window(self) -> None:
+        self.window.show()
+        self.app.processEvents()
+        self.assertFalse(self.window._guide_visible)
+        with patch("hexsolver_cn.app.SettingsDialog") as dialog_type:
+            dialog = dialog_type.return_value
+            dialog.guide_requested = True
+            self.window.open_settings()
+
+        dialog.exec.assert_called_once_with()
+        self.assertTrue(self.window._guide_visible)
+        self.assertTrue(self.window.onboarding_overlay.isVisible())
+        self.assertFalse(self.window.next_button.isEnabled())
 
     def test_original_mouse_controls_setting_persists_and_updates_state(self) -> None:
         dialog = SettingsDialog(None, self.preferences, self.window)

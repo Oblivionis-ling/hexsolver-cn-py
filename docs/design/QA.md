@@ -9,17 +9,17 @@
 
 - [`../images/hard-seed1.png`](../images/hard-seed1.png)：Hard seed 1，已修正棋盘方向和左右斜向标签。
 - [`../images/easy-seed1.png`](../images/easy-seed1.png)：Easy seed 1，226 格大盘与初始公开信息。
-- [`ui-v071-reason-row-linked.png`](ui-v071-reason-row-linked.png)：0.7.1 在 `1440 × 1024` Windows Qt 窗口中固定“D1 / 横向 / 长度 7”，文字加粗、外侧行线索变色且整行格子显示柔光与实线组成的分层高亮。
-- [`ui-v071-reason-array-linked.png`](ui-v071-reason-array-linked.png)：0.7.1 固定同一理由中的长坐标数组，整段文字与全部数组成员作为一个组显示静态分层高亮。
+- [`ui-v073-onboarding.png`](ui-v073-onboarding.png)：0.7.3 在 `1440 × 1024` Windows Qt 窗口中的空盘启动状态，四组手绘箭头分别指向种子生成、手动同步、下一步推理和设置入口。
+- [`ui-v073-settings.png`](ui-v073-settings.png)：0.7.3 设置页首屏，显示启动窗口模式和“重新查看使用说明”入口，并继续露出原版式鼠标操作区域。
 - Implementation pixels: `1440 × 1024`.
 - Logical viewport: `1440 × 1024` at device pixel ratio `1.0`.
-- 仓库保留 `0.7.1` 的应用界面截图作为当前 `0.7.2` 的视觉证据；0.7.2 只优化求解调度，没有修改 UI。
+- 仓库保留 `0.7.3` 的启动说明和设置页作为当前应用界面证据；0.7.1 的分层联动高亮继续由自动回归、成品冒烟和下方历史记录验证。
 
 **Normalized comparison**
 
 - 旧的并排比较图已经在 `0.6.4` 仓库整理时移除；仓库保留两张生成结果证据和两张当前应用界面截图。
 - 早期方案对照曾把 source 与 implementation 归一化到 `1440 × 1024`；该并排图已按仓库整理规则移除，比较结论保留在下方历史中。
-- 当前两张视觉证据直接使用 `1440 × 1024` 真实 Windows Qt 画面，展示演示盘、完整解释以及两类固定引用状态；0.7.2 的界面与之相同。
+- 当前两张视觉证据直接使用 `1440 × 1024` 真实 Windows Qt 画面，展示空盘启动说明、四个真实功能落点，以及可持久化的启动窗口和说明重开设置。
 
 ## Findings
 
@@ -32,6 +32,7 @@ No actionable P0, P1, or P2 differences remain for the selected information arch
 - Copy and content: seed, difficulty, remaining count, manual states, action, coordinate, reason, runtime generation state, and failure recovery are coherent in standalone use. The full Chinese reason remains available through a substantially larger scrollable area at both tested window sizes, while the fixed action bar never overlaps the text viewport.
 - Icons and interaction states: copy, import, undo, reset, zoom, fit, settings, next, apply, selected difficulty, selected manual state, original-mouse toggle, and target-cell states are present and visually distinct.
 - Accessibility: controls use native Qt semantics and keyboard focus behavior, retain high-contrast active states, and use practical click targets. 推理引用既支持点击也支持 Enter/空格；其悬停提示框已完全取消，棋盘预览只做一次有限淡入，系统禁用控件动画或设置 `HEXSOLVER_REDUCED_MOTION=1` 时直接显示静态结果，固定态仍以实线和字重表达。
+- Onboarding and startup: the initial board is intentionally empty rather than a fake puzzle. Four text callouts use the existing orange/cyan tokens, double-stroke hand-drawn arrows and circled endpoints; the explanation can be closed, reopened from settings, and disappears automatically after a verified seed board loads. The startup selector keeps windowed maximized, borderless full-screen and normal-window choices explicit instead of hiding them behind launch flags.
 
 The current Hard runtime capture now shows the same intended content class as the source: a wide irregular generated puzzle and `39` remaining. Easy was separately checked with a much denser 226-cell board; auto-fit keeps the complete puzzle and all line clues visible.
 
@@ -59,7 +60,7 @@ The current Hard runtime capture now shows the same intended content class as th
 
 - Earlier P2: the history trail used generic hex icons without step numbers and the rail was wider than the selected source.
 - Fix: add numbered hex step markers, center the manual-marking header, set the rail to `300` logical pixels, and tighten board-stage padding.
-- Post-fix evidence was later superseded by the then-current `0.6.5` captures; those captures were replaced by `0.7.0`, then by the current `0.7.1` evidence.
+- Post-fix evidence was later superseded by the then-current `0.6.5` captures; those captures were replaced by `0.7.0`, `0.7.1`, and finally the current `0.7.3` onboarding/settings evidence.
 
 ## Follow-up polish
 
@@ -126,6 +127,14 @@ The current Hard runtime capture now shows the same intended content class as th
 - 悬停态使用细虚线并只做一次约 240 ms 缓出淡入；固定态使用深青实线且完全静止，减少动态模式直接显示最终静态层。
 - 两张 `1440 × 1024` 截图由原生 Windows Qt 平台抓取并人工检查；自动回归和成品冒烟检查无提示框、双层几何、虚实线状态及原有键盘路径。
 
+### Pass 12 (`0.7.3`)
+
+- 移除启动模拟盘面，改用空棋盘和四步说明，避免用户把开发样例误认为已经生成的种子结果。
+- 引导覆盖层只淡化右侧棋盘区；种子控件与设置入口仍可操作。四张说明卡使用真实 `QLabel`，具有可读文本和无障碍名称，箭头由 Qt 原生几何绘制，不依赖额外图片。
+- “关闭说明”是独立可聚焦按钮；生成真实盘面后自动收起，设置页“重新查看使用说明”可恢复说明并暂时停用棋盘交互。
+- 启动窗口设置把有窗口最大化作为默认值，同时明确提供无边框全屏和普通窗口；选择通过 `QSettings` 持久化，并在下一次启动时应用。
+- 两张 `1440 × 1024` 截图由原生 Windows Qt 平台抓取并人工检查；中文、箭头落点、按钮、首屏滚动位置和现有橙/青/炭灰视觉语言均正常。
+
 ## Implementation checklist
 
 - [x] Selected direction 2 reproduced as a functional two-column desktop UI.
@@ -135,12 +144,14 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Hard seed 1 at `1440 × 1024` and `1120 × 760` passed visual inspection.
 - [x] Easy seed 1 dense-board capture passed visual inspection.
 - [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
-- [x] 0.7.1 layered row/array reference highlights passed native Windows Qt visual inspection.
-- [x] Sixty-nine automated core, cache, bridge, solver and Qt workflow tests pass.
+- [x] 0.7.3 onboarding and settings passed native Windows Qt visual inspection at `1440 × 1024`.
+- [x] Seventy-three automated core, cache, bridge, solver and Qt workflow tests pass.
 - [x] Full-screen long-reason bottom capture and end-cursor visibility check pass.
 - [x] Hidden, blue and excluded buttons render black, orange and blue active outlines respectively.
 - [x] Original-style mouse controls persist, map real left/right clicks, toggle back to unknown, and restore manual tools when disabled.
 - [x] Row names, individual coordinates and long coordinate arrays link to the correct board elements; hover, pin, keyboard activation and state cleanup pass.
+- [x] Startup is empty and maximized by default; all three window modes persist, the guide can close/reopen, and a verified seed board automatically dismisses it.
+- [x] The apply-suggestion button has no tooltip and retains an accessible name and description.
 - [x] No actionable P0/P1/P2 visual findings remain.
 
 final result: passed

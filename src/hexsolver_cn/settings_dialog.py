@@ -4,6 +4,7 @@ import qtawesome as qta
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
+    QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -16,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import __version__
-from .preferences import AppPreferences
+from .preferences import AppPreferences, StartupWindowMode
 from .seed_cache import SeedCacheStats, SeedResultCache
 from .theme import COLORS
 from .widgets import ChamferPanel
@@ -45,6 +46,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.cache = cache
         self.preferences = preferences or AppPreferences()
+        self.guide_requested = False
         self.setObjectName("SettingsDialog")
         self.setWindowTitle("设置 · HexInfinite 种子求解器")
         self.setWindowIcon(qta.icon("fa5s.cog", color=COLORS["orange"]))
@@ -92,6 +94,21 @@ class SettingsDialog(QDialog):
                 color: {COLORS['white']}; background-color: {COLORS['blue']};
                 border-color: {COLORS['blue']};
             }}
+            QComboBox#StartupModeCombo {{
+                color: {COLORS['text']}; background-color: {COLORS['white']};
+                border: 1px solid {COLORS['border']}; border-radius: 4px;
+                min-height: 40px; padding: 0 12px; font-weight: 650;
+            }}
+            QComboBox#StartupModeCombo:focus {{ border-color: {COLORS['blue']}; }}
+            QComboBox#StartupModeCombo::drop-down {{
+                border: none; width: 32px;
+            }}
+            QPushButton#GuideButton {{
+                color: {COLORS['blue_hover']}; background-color: {COLORS['white']};
+                border: 1px solid {COLORS['blue']}; border-radius: 4px;
+                min-height: 40px; padding: 0 16px; font-weight: 700;
+            }}
+            QPushButton#GuideButton:hover {{ background-color: {COLORS['blue_soft']}; }}
             """
         )
 
@@ -136,6 +153,8 @@ class SettingsDialog(QDialog):
         self.sections_layout = QVBoxLayout(content)
         self.sections_layout.setContentsMargins(0, 0, 6, 0)
         self.sections_layout.setSpacing(14)
+        self.sections_layout.addWidget(self._build_startup_section())
+        self.sections_layout.addWidget(self._build_guide_section())
         self.sections_layout.addWidget(self._build_mouse_controls_section())
         self.sections_layout.addWidget(self._build_cache_section())
         self.sections_layout.addStretch(1)
@@ -155,6 +174,97 @@ class SettingsDialog(QDialog):
         root_layout.addLayout(footer)
 
         self.refresh_cache_stats()
+
+    def _build_startup_section(self) -> QWidget:
+        panel = ChamferPanel(fill=COLORS["panel"], border=COLORS["border"], chamfer=13)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(12)
+
+        heading = QHBoxLayout()
+        heading.setSpacing(10)
+        icon = QLabel()
+        icon.setPixmap(qta.icon("fa5s.desktop", color=COLORS["blue"]).pixmap(22, 22))
+        heading.addWidget(icon)
+        title = QLabel("启动窗口")
+        title.setObjectName("SettingsSectionTitle")
+        heading.addWidget(title)
+        heading.addStretch(1)
+        layout.addLayout(heading)
+
+        description = QLabel(
+            "选择应用下次启动时的窗口状态。有窗口最大化保留标题栏和系统任务栏；"
+            "无边框全屏占满整个屏幕；普通窗口使用 1440 × 1024 的默认尺寸。"
+        )
+        description.setObjectName("SettingsDescription")
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        self.startup_mode_combo = QComboBox()
+        self.startup_mode_combo.setObjectName("StartupModeCombo")
+        self.startup_mode_combo.setAccessibleName("应用启动窗口模式")
+        self.startup_mode_combo.setAccessibleDescription("设置下次启动时使用的窗口状态")
+        for mode in StartupWindowMode:
+            self.startup_mode_combo.addItem(mode.label, mode.value)
+        selected_index = self.startup_mode_combo.findData(
+            self.preferences.startup_window_mode.value
+        )
+        self.startup_mode_combo.setCurrentIndex(max(0, selected_index))
+        self.startup_mode_combo.currentIndexChanged.connect(self._set_startup_mode)
+        layout.addWidget(self.startup_mode_combo)
+        return panel
+
+    def _set_startup_mode(self, index: int = -1) -> None:
+        value = self.startup_mode_combo.currentData()
+        try:
+            mode = StartupWindowMode(str(value))
+        except ValueError:
+            mode = StartupWindowMode.MAXIMIZED
+        self.preferences.set_startup_window_mode(mode)
+        self.feedback_label.setText("启动窗口设置已保存，将在下次启动时生效。")
+        self.feedback_label.setStyleSheet(f"color: {COLORS['blue_hover']};")
+
+    def _build_guide_section(self) -> QWidget:
+        panel = ChamferPanel(fill=COLORS["panel"], border=COLORS["border"], chamfer=13)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(12)
+
+        heading = QHBoxLayout()
+        heading.setSpacing(10)
+        icon = QLabel()
+        icon.setPixmap(qta.icon("fa5s.route", color=COLORS["orange"]).pixmap(22, 22))
+        heading.addWidget(icon)
+        title = QLabel("使用说明")
+        title.setObjectName("SettingsSectionTitle")
+        heading.addWidget(title)
+        heading.addStretch(1)
+        layout.addLayout(heading)
+
+        description = QLabel(
+            "重新显示启动时的手绘引导，查看种子生成、手动同步、下一步推理和设置入口。"
+            "引导可以随时关闭，成功生成地图后也会自动收起。"
+        )
+        description.setObjectName("SettingsDescription")
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        action_row = QHBoxLayout()
+        action_row.addStretch(1)
+        self.show_guide_button = QPushButton("重新查看使用说明")
+        self.show_guide_button.setObjectName("GuideButton")
+        self.show_guide_button.setIcon(
+            qta.icon("fa5s.map-signs", color=COLORS["blue_hover"])
+        )
+        self.show_guide_button.setAccessibleName("重新查看使用说明")
+        self.show_guide_button.clicked.connect(self._request_guide)
+        action_row.addWidget(self.show_guide_button)
+        layout.addLayout(action_row)
+        return panel
+
+    def _request_guide(self) -> None:
+        self.guide_requested = True
+        self.accept()
 
     def _build_mouse_controls_section(self) -> QWidget:
         panel = ChamferPanel(fill=COLORS["panel"], border=COLORS["border"], chamfer=13)
