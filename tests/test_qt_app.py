@@ -10,7 +10,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QEvent, QPointF, QSettings, Qt  # noqa: E402
-from PySide6.QtGui import QColor, QFont, QTextCursor  # noqa: E402
+from PySide6.QtGui import QColor, QFont, QPalette, QTextCursor  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
@@ -514,6 +514,77 @@ class QtAppWorkflowTests(unittest.TestCase):
         dialog.show_guide_button.click()
         self.app.processEvents()
         self.assertTrue(dialog.guide_requested)
+
+    def test_startup_mode_uses_white_collapsed_combo_and_white_popup(self) -> None:
+        dialog = SettingsDialog(None, self.preferences, self.window)
+        dialog.show()
+        self.app.processEvents()
+
+        combo = dialog.startup_mode_combo
+        popup = combo.view()
+        self.assertFalse(popup.isVisible())
+        self.assertEqual(3, combo.count())
+        self.assertEqual(
+            QColor("#FFFFFF"),
+            popup.palette().color(QPalette.ColorRole.Base),
+        )
+        self.assertEqual(
+            QColor("#3C3E40"),
+            popup.palette().color(QPalette.ColorRole.Text),
+        )
+
+        collapsed = combo.grab().toImage()
+        collapsed_light_pixels = sum(
+            collapsed.pixelColor(x, y).red() >= 245
+            and collapsed.pixelColor(x, y).green() >= 245
+            and collapsed.pixelColor(x, y).blue() >= 245
+            for x in range(collapsed.width())
+            for y in range(collapsed.height())
+        )
+        self.assertGreater(
+            collapsed_light_pixels,
+            collapsed.width() * collapsed.height() * 0.55,
+        )
+        chevron_center_x = collapsed.width() - 20
+        chevron_center_y = collapsed.height() // 2
+        chevron_dark_pixels = sum(
+            collapsed.pixelColor(x, y).red() < 180
+            and collapsed.pixelColor(x, y).green() < 180
+            and collapsed.pixelColor(x, y).blue() < 180
+            for x in range(chevron_center_x - 6, chevron_center_x + 7)
+            for y in range(chevron_center_y - 6, chevron_center_y + 7)
+        )
+        self.assertGreater(chevron_dark_pixels, 8)
+
+        combo.showPopup()
+        self.app.processEvents()
+        self.assertTrue(popup.isVisible())
+        popup_image = popup.viewport().grab().toImage()
+        light_pixels = 0
+        dark_surface_pixels = 0
+        selected_pixels = 0
+        for x in range(popup_image.width()):
+            for y in range(popup_image.height()):
+                color = popup_image.pixelColor(x, y)
+                if color.red() >= 220 and color.green() >= 220 and color.blue() >= 220:
+                    light_pixels += 1
+                if color.red() <= 70 and color.green() <= 70 and color.blue() <= 70:
+                    dark_surface_pixels += 1
+                if (
+                    abs(color.red() - 221) <= 3
+                    and abs(color.green() - 244) <= 3
+                    and abs(color.blue() - 252) <= 3
+                ):
+                    selected_pixels += 1
+        pixel_count = popup_image.width() * popup_image.height()
+        self.assertGreater(light_pixels, pixel_count * 0.65)
+        self.assertLess(dark_surface_pixels, pixel_count * 0.12)
+        self.assertGreater(selected_pixels, pixel_count * 0.20)
+
+        combo.hidePopup()
+        self.app.processEvents()
+        self.assertFalse(popup.isVisible())
+        dialog.close()
 
     def test_settings_guide_request_reopens_onboarding_in_main_window(self) -> None:
         self.window.show()

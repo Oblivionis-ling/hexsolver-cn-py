@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import qtawesome as qta
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPointF, QSize, Qt
+from PySide6.QtGui import QColor, QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
     QDialog,
     QComboBox,
@@ -12,6 +13,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QVBoxLayout,
     QWidget,
 )
@@ -32,6 +36,59 @@ def format_storage_size(byte_count: int) -> str:
             return f"{value:.1f} {unit}"
         value /= 1024.0
     return "0 B"
+
+
+class StartupModeComboBox(QComboBox):
+    """Branded combo box with an explicit, theme-independent chevron."""
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt override
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        color = COLORS["blue"] if self.hasFocus() else COLORS["muted"]
+        pen = QPen(QColor(color), 2.0)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        center_x = float(self.width() - 20)
+        center_y = float(self.height()) / 2.0
+        painter.drawLine(
+            QPointF(center_x - 4.0, center_y - 2.0),
+            QPointF(center_x, center_y + 2.0),
+        )
+        painter.drawLine(
+            QPointF(center_x, center_y + 2.0),
+            QPointF(center_x + 4.0, center_y - 2.0),
+        )
+
+
+class StartupModeItemDelegate(QStyledItemDelegate):
+    """Keep popup rows legible and selected states consistent on Windows."""
+
+    def paint(self, painter, option, index) -> None:
+        styled = QStyleOptionViewItem(option)
+        active = bool(
+            styled.state
+            & (QStyle.StateFlag.State_Selected | QStyle.StateFlag.State_MouseOver)
+        )
+        styled.state &= ~QStyle.StateFlag.State_HasFocus
+        styled.palette.setColor(
+            QPalette.ColorRole.Highlight,
+            QColor(COLORS["blue_soft"]),
+        )
+        styled.palette.setColor(
+            QPalette.ColorRole.HighlightedText,
+            QColor(COLORS["reason_text"]),
+        )
+        styled.palette.setColor(
+            QPalette.ColorRole.Text,
+            QColor(COLORS["reason_text"] if active else COLORS["text"]),
+        )
+        super().paint(painter, styled, index)
+
+    def sizeHint(self, option, index) -> QSize:  # noqa: N802 - Qt override
+        hint = super().sizeHint(option, index)
+        return QSize(hint.width(), max(38, hint.height()))
 
 
 class SettingsDialog(QDialog):
@@ -93,15 +150,6 @@ class SettingsDialog(QDialog):
             QPushButton#SettingsToggleButton:checked:pressed {{
                 color: {COLORS['white']}; background-color: {COLORS['blue']};
                 border-color: {COLORS['blue']};
-            }}
-            QComboBox#StartupModeCombo {{
-                color: {COLORS['text']}; background-color: {COLORS['white']};
-                border: 1px solid {COLORS['border']}; border-radius: 4px;
-                min-height: 40px; padding: 0 12px; font-weight: 650;
-            }}
-            QComboBox#StartupModeCombo:focus {{ border-color: {COLORS['blue']}; }}
-            QComboBox#StartupModeCombo::drop-down {{
-                border: none; width: 32px;
             }}
             QPushButton#GuideButton {{
                 color: {COLORS['blue_hover']}; background-color: {COLORS['white']};
@@ -200,10 +248,83 @@ class SettingsDialog(QDialog):
         description.setWordWrap(True)
         layout.addWidget(description)
 
-        self.startup_mode_combo = QComboBox()
+        self.startup_mode_combo = StartupModeComboBox(panel)
         self.startup_mode_combo.setObjectName("StartupModeCombo")
         self.startup_mode_combo.setAccessibleName("应用启动窗口模式")
         self.startup_mode_combo.setAccessibleDescription("设置下次启动时使用的窗口状态")
+        self.startup_mode_combo.setMaxVisibleItems(len(StartupWindowMode))
+        self.startup_mode_combo.setStyleSheet(
+            f"""
+            QComboBox#StartupModeCombo {{
+                color: {COLORS['text']}; background-color: {COLORS['white']};
+                border: 1px solid {COLORS['border']}; border-radius: 4px;
+                min-height: 42px; padding: 0 46px 0 14px; font-weight: 650;
+            }}
+            QComboBox#StartupModeCombo:hover {{ border-color: #CED2D1; }}
+            QComboBox#StartupModeCombo:focus {{
+                border: 2px solid {COLORS['blue']};
+                padding-left: 13px;
+            }}
+            QComboBox#StartupModeCombo::drop-down {{
+                subcontrol-origin: padding; subcontrol-position: top right;
+                width: 40px; background-color: {COLORS['panel_alt']};
+                border: none; border-left: 1px solid {COLORS['border']};
+                border-top-right-radius: 4px; border-bottom-right-radius: 4px;
+            }}
+            """
+        )
+        # Stylesheets disable auto-fill during polish. Polish first so the white
+        # surface below is retained on every Windows theme and Qt style.
+        self.startup_mode_combo.ensurePolished()
+        self.startup_mode_combo.setAutoFillBackground(True)
+        combo_palette = self.startup_mode_combo.palette()
+        for role in (
+            QPalette.ColorRole.Window,
+            QPalette.ColorRole.Base,
+            QPalette.ColorRole.Button,
+        ):
+            combo_palette.setColor(role, QColor(COLORS["white"]))
+        combo_palette.setColor(QPalette.ColorRole.Text, QColor(COLORS["text"]))
+        combo_palette.setColor(QPalette.ColorRole.ButtonText, QColor(COLORS["text"]))
+        self.startup_mode_combo.setPalette(combo_palette)
+        popup = self.startup_mode_combo.view()
+        popup.setObjectName("StartupModePopup")
+        popup.setAutoFillBackground(True)
+        popup.viewport().setAutoFillBackground(True)
+        popup.setMouseTracking(True)
+        popup.setItemDelegate(StartupModeItemDelegate(popup))
+        popup.setStyleSheet(
+            f"""
+            QAbstractItemView#StartupModePopup {{
+                color: {COLORS['text']}; background-color: {COLORS['white']};
+                border: 1px solid {COLORS['border']};
+                outline: none; padding: 4px;
+                selection-color: {COLORS['reason_text']};
+                selection-background-color: {COLORS['blue_soft']};
+            }}
+            QAbstractItemView#StartupModePopup::item {{
+                color: {COLORS['text']}; background-color: {COLORS['white']};
+                border: none; min-height: 38px; padding: 0 12px;
+            }}
+            QAbstractItemView#StartupModePopup::item:hover,
+            QAbstractItemView#StartupModePopup::item:selected {{
+                color: {COLORS['reason_text']};
+                background-color: {COLORS['blue_soft']};
+            }}
+            """
+        )
+        popup_palette = popup.palette()
+        popup_palette.setColor(QPalette.ColorRole.Base, QColor(COLORS["white"]))
+        popup_palette.setColor(QPalette.ColorRole.Text, QColor(COLORS["text"]))
+        popup_palette.setColor(
+            QPalette.ColorRole.Highlight,
+            QColor(COLORS["blue_soft"]),
+        )
+        popup_palette.setColor(
+            QPalette.ColorRole.HighlightedText,
+            QColor(COLORS["reason_text"]),
+        )
+        popup.setPalette(popup_palette)
         for mode in StartupWindowMode:
             self.startup_mode_combo.addItem(mode.label, mode.value)
         selected_index = self.startup_mode_combo.findData(

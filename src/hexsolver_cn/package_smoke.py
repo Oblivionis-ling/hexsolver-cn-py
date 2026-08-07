@@ -6,7 +6,7 @@ import traceback
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QColor, QFont, QTextCursor
+from PySide6.QtGui import QColor, QFont, QPalette, QTextCursor
 from PySide6.QtWidgets import QApplication
 
 from .app import (
@@ -110,6 +110,51 @@ def _verify_manual_outline_colors(window: MainWindow, app: QApplication) -> None
             raise RuntimeError(f"手动标记 {state.value} 没有实际绘制选中轮廓。")
     window.state_buttons[CellVisualType.HIDDEN].click()
     app.processEvents()
+
+
+def _verify_startup_mode_dropdown(settings: SettingsDialog, app: QApplication) -> None:
+    combo = settings.startup_mode_combo
+    popup = combo.view()
+    if popup.isVisible() or combo.count() != len(StartupWindowMode):
+        raise RuntimeError("启动窗口选择器没有保持折叠下拉状态。")
+    if (
+        popup.palette().color(QPalette.ColorRole.Base) != QColor("#FFFFFF")
+        or popup.palette().color(QPalette.ColorRole.Text) != QColor("#3C3E40")
+    ):
+        raise RuntimeError("启动窗口下拉菜单没有使用白底深色文字。")
+
+    combo.showPopup()
+    app.processEvents()
+    if not popup.isVisible():
+        raise RuntimeError("启动窗口下拉菜单无法展开。")
+    image = popup.viewport().grab().toImage()
+    light_pixels = 0
+    dark_surface_pixels = 0
+    selected_pixels = 0
+    for x in range(image.width()):
+        for y in range(image.height()):
+            color = image.pixelColor(x, y)
+            if color.red() >= 220 and color.green() >= 220 and color.blue() >= 220:
+                light_pixels += 1
+            if color.red() <= 70 and color.green() <= 70 and color.blue() <= 70:
+                dark_surface_pixels += 1
+            if (
+                abs(color.red() - 221) <= 3
+                and abs(color.green() - 244) <= 3
+                and abs(color.blue() - 252) <= 3
+            ):
+                selected_pixels += 1
+    pixel_count = image.width() * image.height()
+    if (
+        light_pixels <= pixel_count * 0.65
+        or dark_surface_pixels >= pixel_count * 0.12
+        or selected_pixels <= pixel_count * 0.20
+    ):
+        raise RuntimeError("启动窗口下拉菜单未正确渲染白底、浅蓝选中态，或仍存在深色大块。")
+    combo.hidePopup()
+    app.processEvents()
+    if popup.isVisible():
+        raise RuntimeError("启动窗口下拉菜单选择后没有恢复折叠状态。")
 
 
 def _verify_reason_interactions(window: MainWindow, app: QApplication) -> None:
@@ -251,6 +296,8 @@ def run_package_smoke_test() -> int:
         ):
             raise RuntimeError("打包界面缺少可访问的设置入口。")
         settings = SettingsDialog(registry.cache, preferences, window)
+        settings.show()
+        app.processEvents()
         if registry.cache is None or settings.cache_path_value.text() != str(
             registry.cache.directory
         ):
@@ -260,6 +307,7 @@ def run_package_smoke_test() -> int:
             != StartupWindowMode.MAXIMIZED.value
         ):
             raise RuntimeError("设置页没有显示默认的有窗口最大化启动模式。")
+        _verify_startup_mode_dropdown(settings, app)
         fullscreen_index = settings.startup_mode_combo.findData(
             StartupWindowMode.FULLSCREEN.value
         )

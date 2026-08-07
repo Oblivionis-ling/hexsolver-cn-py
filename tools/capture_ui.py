@@ -4,6 +4,8 @@ import argparse
 import time
 from pathlib import Path
 
+from PySide6.QtCore import QPoint
+from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QApplication
 
 from hexsolver_cn.app import MainWindow
@@ -26,10 +28,13 @@ def main() -> None:
     parser.add_argument("--difficulty", choices=("easy", "hard"), default="hard")
     parser.add_argument("--generation-timeout", type=float, default=180.0)
     parser.add_argument("--settings", action="store_true")
+    parser.add_argument("--open-startup-dropdown", action="store_true")
     parser.add_argument("--manual-state", choices=("hidden", "blue", "black"))
     parser.add_argument("--original-mouse-controls", action="store_true")
     parser.add_argument("--pin-reason-reference", choices=("row", "array"))
     args = parser.parse_args()
+    if args.open_startup_dropdown and not args.settings:
+        parser.error("--open-startup-dropdown requires --settings")
 
     app = QApplication.instance() or QApplication([])
     app.setStyle("Fusion")
@@ -121,10 +126,23 @@ def main() -> None:
         settings_dialog = SettingsDialog(window.seed_generators.cache, preferences, window)
         settings_dialog.show()
         app.processEvents()
+        if args.open_startup_dropdown:
+            settings_dialog.startup_mode_combo.showPopup()
+            app.processEvents()
         target = settings_dialog
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    if not target.grab().save(str(args.output), "PNG"):
+    if args.open_startup_dropdown:
+        capture = target.grab()
+        popup_window = settings_dialog.startup_mode_combo.view().window()
+        popup_capture = popup_window.grab()
+        popup_origin = target.mapFromGlobal(popup_window.mapToGlobal(QPoint(0, 0)))
+        painter = QPainter(capture)
+        painter.drawPixmap(popup_origin, popup_capture)
+        painter.end()
+    else:
+        capture = target.grab()
+    if not capture.save(str(args.output), "PNG"):
         raise SystemExit(f"Could not save screenshot: {args.output}")
     print(args.output.resolve())
 
