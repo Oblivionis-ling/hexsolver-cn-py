@@ -140,6 +140,7 @@ class InteractiveReasonBrowser(QTextBrowser):
     """Read-only reason text whose board references can be previewed or pinned."""
 
     reference_focus_changed = Signal(object, bool)
+    pin_state_changed = Signal()
 
     def __init__(self, parent=None) -> None:  # type: ignore[no-untyped-def]
         super().__init__(parent)
@@ -201,6 +202,26 @@ class InteractiveReasonBrowser(QTextBrowser):
         self._pressed = None
         self._refresh_reference_formats()
         self.reference_focus_changed.emit(None, False)
+
+    def restore_view_state(
+        self,
+        pinned_reference_id: Optional[str],
+        scroll_value: int,
+    ) -> None:
+        self._pinned = next(
+            (
+                reference
+                for reference in self._references
+                if reference.reference_id == pinned_reference_id
+            ),
+            None,
+        )
+        self._hovered = None
+        self._pressed = None
+        self._refresh_reference_formats()
+        self._emit_active_reference()
+        scroll_bar = self.verticalScrollBar()
+        scroll_bar.setValue(max(scroll_bar.minimum(), min(scroll_value, scroll_bar.maximum())))
 
     def reference_cursor_rect(self, reference: ReasonReference):  # type: ignore[no-untyped-def]
         cursor = QTextCursor(self.document())
@@ -277,6 +298,7 @@ class InteractiveReasonBrowser(QTextBrowser):
         self._pinned = None if self._pinned == reference else reference
         self._refresh_reference_formats()
         self._emit_active_reference()
+        self.pin_state_changed.emit()
 
     def _clear_hover(self) -> None:
         if self._hovered is not None:

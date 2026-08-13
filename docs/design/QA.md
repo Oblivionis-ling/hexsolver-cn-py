@@ -10,16 +10,17 @@
 - [`../images/hard-seed1.png`](../images/hard-seed1.png)：Hard seed 1，已修正棋盘方向和左右斜向标签。
 - [`../images/easy-seed1.png`](../images/easy-seed1.png)：Easy seed 1，226 格大盘与初始公开信息。
 - [`ui-v073-onboarding.png`](ui-v073-onboarding.png)：0.7.3 在 `1440 × 1024` Windows Qt 窗口中的空盘启动状态，四组手绘箭头分别指向种子生成、手动同步、下一步推理和设置入口。
-- [`ui-v073-settings.png`](ui-v073-settings.png)：0.7.3 设置页首屏，显示启动窗口模式和“重新查看使用说明”入口，并继续露出原版式鼠标操作区域。
-- Implementation pixels: `1440 × 1024`.
-- Logical viewport: `1440 × 1024` at device pixel ratio `1.0`.
-- 仓库保留 `0.7.3` 的启动说明和设置页作为当前应用界面证据；0.7.1 的分层联动高亮继续由自动回归、成品冒烟和下方历史记录验证。
+- [`ui-v074-settings-dropdown.png`](ui-v074-settings-dropdown.png)：0.7.4 设置页的启动窗口下拉菜单已展开，显示白底、深色文字、浅蓝当前项和三个完整选项。
+- [`ui-v080-settings-progress-native.png`](ui-v080-settings-progress-native.png)：0.8.0 设置页局面与进度卡，显示自动恢复状态、手动保存/载入和清除进度入口。
+- Onboarding implementation pixels: `1440 × 1024` at device pixel ratio `1.0`.
+- 0.7.4 settings evidence pixels: `1440 × 1200`; logical dialog viewport: `720 × 600` at device pixel ratio `2.0`.
+- 仓库保留 0.7.3 启动说明、0.7.4 白底下拉菜单和 0.8.0 局面进度卡作为当前应用界面证据；0.7.1 的分层联动高亮继续由自动回归、成品冒烟和下方历史记录验证。
 
 **Normalized comparison**
 
 - 旧的并排比较图已经在 `0.6.4` 仓库整理时移除；仓库保留两张生成结果证据和两张当前应用界面截图。
 - 早期方案对照曾把 source 与 implementation 归一化到 `1440 × 1024`；该并排图已按仓库整理规则移除，比较结论保留在下方历史中。
-- 当前两张视觉证据直接使用 `1440 × 1024` 真实 Windows Qt 画面，展示空盘启动说明、四个真实功能落点，以及可持久化的启动窗口和说明重开设置。
+- 当前视觉证据由真实 Windows Qt 平台生成：启动说明继续使用 `1440 × 1024` 画面，下拉菜单使用 `720 × 600` 逻辑设置窗口并保留当前 Windows 的 `2.0` 设备像素比，不伪造缩放环境。
 
 ## Findings
 
@@ -32,7 +33,7 @@ No actionable P0, P1, or P2 differences remain for the selected information arch
 - Copy and content: seed, difficulty, remaining count, manual states, action, coordinate, reason, runtime generation state, and failure recovery are coherent in standalone use. The full Chinese reason remains available through a substantially larger scrollable area at both tested window sizes, while the fixed action bar never overlaps the text viewport.
 - Icons and interaction states: copy, import, undo, reset, zoom, fit, settings, next, apply, selected difficulty, selected manual state, original-mouse toggle, and target-cell states are present and visually distinct.
 - Accessibility: controls use native Qt semantics and keyboard focus behavior, retain high-contrast active states, and use practical click targets. 推理引用既支持点击也支持 Enter/空格；其悬停提示框已完全取消，棋盘预览只做一次有限淡入，系统禁用控件动画或设置 `HEXSOLVER_REDUCED_MOTION=1` 时直接显示静态结果，固定态仍以实线和字重表达。
-- Onboarding and startup: the initial board is intentionally empty rather than a fake puzzle. Four text callouts use the existing orange/cyan tokens, double-stroke hand-drawn arrows and circled endpoints; the explanation can be closed, reopened from settings, and disappears automatically after a verified seed board loads. The startup selector keeps windowed maximized, borderless full-screen and normal-window choices explicit instead of hiding them behind launch flags.
+- Onboarding and startup: the initial board is intentionally empty rather than a fake puzzle. Four text callouts use the existing orange/cyan tokens, double-stroke hand-drawn arrows and circled endpoints; the explanation can be closed, reopened from settings, and disappears automatically after a verified seed board loads. The startup selector is collapsed by default, uses a white surface and explicit chevron, and reveals windowed maximized, borderless full-screen and normal-window choices in a white popup with a light-cyan current/hover state.
 
 The current Hard runtime capture now shows the same intended content class as the source: a wide irregular generated puzzle and `39` remaining. Easy was separately checked with a much denser 226-cell board; auto-fit keeps the complete puzzle and all line clues visible.
 
@@ -60,7 +61,7 @@ The current Hard runtime capture now shows the same intended content class as th
 
 - Earlier P2: the history trail used generic hex icons without step numbers and the rail was wider than the selected source.
 - Fix: add numbered hex step markers, center the manual-marking header, set the rail to `300` logical pixels, and tighten board-stage padding.
-- Post-fix evidence was later superseded by the then-current `0.6.5` captures; those captures were replaced by `0.7.0`, `0.7.1`, and finally the current `0.7.3` onboarding/settings evidence.
+- Post-fix evidence was later superseded by the then-current `0.6.5` captures; those captures were replaced by `0.7.0`, `0.7.1`, the still-current `0.7.3` onboarding, and the `0.7.4` startup-dropdown evidence.
 
 ## Follow-up polish
 
@@ -135,6 +136,19 @@ The current Hard runtime capture now shows the same intended content class as th
 - 启动窗口设置把有窗口最大化作为默认值，同时明确提供无边框全屏和普通窗口；选择通过 `QSettings` 持久化，并在下一次启动时应用。
 - 两张 `1440 × 1024` 截图由原生 Windows Qt 平台抓取并人工检查；中文、箭头落点、按钮、首屏滚动位置和现有橙/青/炭灰视觉语言均正常。
 
+### Pass 13 (`0.7.4`)
+
+- 根据用户真实全屏截图定位，原启动窗口弹出列表未指定完整调色板，在 Windows/Fusion 样式下继承了深色表面与低对比文字。
+- 折叠控件改为独立白底表面，只显示当前选项和明确箭头；键盘聚焦时使用蓝色轮廓，不依赖鼠标悬停。
+- 弹出列表通过 QSS、`QPalette` 和专用 item delegate 共同约束为白底深色文字，当前/悬停项使用浅蓝底与深青文字，并去除系统深色大块和粗重焦点框。
+- 原生 Windows Qt 截图人工检查了白底、三项文字、浅蓝当前项、首屏层级和原有橙/青/炭灰风格；回归测试另外核对默认折叠、展开/收起、调色板与实际像素比例。
+
+### Pass 14 (`0.8.0`)
+
+- 设置页在启动窗口下方增加“局面与进度”卡片；自动恢复使用青色按钮与浅青状态徽标，手动保存/载入使用蓝色轮廓，清除进度使用红色轮廓。
+- 无活动局面时保存与清除按钮具有明确灰色禁用态，载入入口保持可用；滚动结构和固定“完成”按钮不变。
+- 原生 Windows Qt 截图确认文字对比度、按钮层级、卡片间距和 1440 × 1024 首屏滚动位置正常。
+
 ## Implementation checklist
 
 - [x] Selected direction 2 reproduced as a functional two-column desktop UI.
@@ -144,14 +158,15 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Hard seed 1 at `1440 × 1024` and `1120 × 760` passed visual inspection.
 - [x] Easy seed 1 dense-board capture passed visual inspection.
 - [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
-- [x] 0.7.3 onboarding and settings passed native Windows Qt visual inspection at `1440 × 1024`.
-- [x] Seventy-three automated core, cache, bridge, solver and Qt workflow tests pass.
+- [x] 0.7.3 onboarding and 0.7.4 white startup dropdown passed native Windows Qt visual inspection at their recorded logical sizes and device pixel ratios.
+- [x] Eighty-four automated core, cache, bridge, solver, session-store and Qt workflow tests pass.
 - [x] Full-screen long-reason bottom capture and end-cursor visibility check pass.
 - [x] Hidden, blue and excluded buttons render black, orange and blue active outlines respectively.
 - [x] Original-style mouse controls persist, map real left/right clicks, toggle back to unknown, and restore manual tools when disabled.
 - [x] Row names, individual coordinates and long coordinate arrays link to the correct board elements; hover, pin, keyboard activation and state cleanup pass.
 - [x] Startup is empty and maximized by default; all three window modes persist, the guide can close/reopen, and a verified seed board automatically dismisses it.
 - [x] The apply-suggestion button has no tooltip and retains an accessible name and description.
+- [x] Progress settings, save/load/clear actions and the restore-state badge remain legible on native Windows Qt.
 - [x] No actionable P0/P1/P2 visual findings remain.
 
 final result: passed

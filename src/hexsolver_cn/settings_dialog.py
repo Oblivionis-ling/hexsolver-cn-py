@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import qtawesome as qta
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPointF, QSize, Qt
+from PySide6.QtGui import QColor, QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
     QDialog,
     QComboBox,
@@ -12,6 +13,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QVBoxLayout,
     QWidget,
 )
@@ -19,6 +23,7 @@ from PySide6.QtWidgets import (
 from . import __version__
 from .preferences import AppPreferences, StartupWindowMode
 from .seed_cache import SeedCacheStats, SeedResultCache
+from .session_store import SessionStore
 from .theme import COLORS
 from .widgets import ChamferPanel
 
@@ -34,6 +39,59 @@ def format_storage_size(byte_count: int) -> str:
     return "0 B"
 
 
+class StartupModeComboBox(QComboBox):
+    """Branded combo box with an explicit, theme-independent chevron."""
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt override
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        color = COLORS["blue"] if self.hasFocus() else COLORS["muted"]
+        pen = QPen(QColor(color), 2.0)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        center_x = float(self.width() - 20)
+        center_y = float(self.height()) / 2.0
+        painter.drawLine(
+            QPointF(center_x - 4.0, center_y - 2.0),
+            QPointF(center_x, center_y + 2.0),
+        )
+        painter.drawLine(
+            QPointF(center_x, center_y + 2.0),
+            QPointF(center_x + 4.0, center_y - 2.0),
+        )
+
+
+class StartupModeItemDelegate(QStyledItemDelegate):
+    """Keep popup rows legible and selected states consistent on Windows."""
+
+    def paint(self, painter, option, index) -> None:
+        styled = QStyleOptionViewItem(option)
+        active = bool(
+            styled.state
+            & (QStyle.StateFlag.State_Selected | QStyle.StateFlag.State_MouseOver)
+        )
+        styled.state &= ~QStyle.StateFlag.State_HasFocus
+        styled.palette.setColor(
+            QPalette.ColorRole.Highlight,
+            QColor(COLORS["blue_soft"]),
+        )
+        styled.palette.setColor(
+            QPalette.ColorRole.HighlightedText,
+            QColor(COLORS["reason_text"]),
+        )
+        styled.palette.setColor(
+            QPalette.ColorRole.Text,
+            QColor(COLORS["reason_text"] if active else COLORS["text"]),
+        )
+        super().paint(painter, styled, index)
+
+    def sizeHint(self, option, index) -> QSize:  # noqa: N802 - Qt override
+        hint = super().sizeHint(option, index)
+        return QSize(hint.width(), max(38, hint.height()))
+
+
 class SettingsDialog(QDialog):
     """Scrollable settings surface designed to accept more sections later."""
 
@@ -42,11 +100,19 @@ class SettingsDialog(QDialog):
         cache: SeedResultCache | None,
         preferences: AppPreferences | None = None,
         parent: QWidget | None = None,
+        *,
+        session_store: SessionStore | None = None,
+        has_active_session: bool = False,
     ) -> None:
         super().__init__(parent)
         self.cache = cache
         self.preferences = preferences or AppPreferences()
+        self.session_store = session_store
+        self.has_active_session = has_active_session
         self.guide_requested = False
+        self.save_progress_requested = False
+        self.load_progress_requested = False
+        self.clear_progress_requested = False
         self.setObjectName("SettingsDialog")
         self.setWindowTitle("设置 · HexInfinite 种子求解器")
         self.setWindowIcon(qta.icon("fa5s.cog", color=COLORS["orange"]))
@@ -76,6 +142,10 @@ class SettingsDialog(QDialog):
             QPushButton#DangerButton:hover {{
                 color: {COLORS['white']}; background: {COLORS['danger']};
             }}
+            QPushButton#DangerButton:disabled {{
+                color: {COLORS['faint']}; background: transparent;
+                border-color: {COLORS['border']};
+            }}
             QPushButton#DialogCloseButton {{
                 color: {COLORS['white']}; background: {COLORS['blue']};
                 border: none; border-radius: 4px; min-height: 40px;
@@ -94,21 +164,16 @@ class SettingsDialog(QDialog):
                 color: {COLORS['white']}; background-color: {COLORS['blue']};
                 border-color: {COLORS['blue']};
             }}
-            QComboBox#StartupModeCombo {{
-                color: {COLORS['text']}; background-color: {COLORS['white']};
-                border: 1px solid {COLORS['border']}; border-radius: 4px;
-                min-height: 40px; padding: 0 12px; font-weight: 650;
-            }}
-            QComboBox#StartupModeCombo:focus {{ border-color: {COLORS['blue']}; }}
-            QComboBox#StartupModeCombo::drop-down {{
-                border: none; width: 32px;
-            }}
             QPushButton#GuideButton {{
                 color: {COLORS['blue_hover']}; background-color: {COLORS['white']};
                 border: 1px solid {COLORS['blue']}; border-radius: 4px;
                 min-height: 40px; padding: 0 16px; font-weight: 700;
             }}
             QPushButton#GuideButton:hover {{ background-color: {COLORS['blue_soft']}; }}
+            QPushButton#GuideButton:disabled {{
+                color: {COLORS['faint']}; background-color: {COLORS['panel_alt']};
+                border-color: {COLORS['border']};
+            }}
             """
         )
 
@@ -154,6 +219,7 @@ class SettingsDialog(QDialog):
         self.sections_layout.setContentsMargins(0, 0, 6, 0)
         self.sections_layout.setSpacing(14)
         self.sections_layout.addWidget(self._build_startup_section())
+        self.sections_layout.addWidget(self._build_progress_section())
         self.sections_layout.addWidget(self._build_guide_section())
         self.sections_layout.addWidget(self._build_mouse_controls_section())
         self.sections_layout.addWidget(self._build_cache_section())
@@ -200,10 +266,83 @@ class SettingsDialog(QDialog):
         description.setWordWrap(True)
         layout.addWidget(description)
 
-        self.startup_mode_combo = QComboBox()
+        self.startup_mode_combo = StartupModeComboBox(panel)
         self.startup_mode_combo.setObjectName("StartupModeCombo")
         self.startup_mode_combo.setAccessibleName("应用启动窗口模式")
         self.startup_mode_combo.setAccessibleDescription("设置下次启动时使用的窗口状态")
+        self.startup_mode_combo.setMaxVisibleItems(len(StartupWindowMode))
+        self.startup_mode_combo.setStyleSheet(
+            f"""
+            QComboBox#StartupModeCombo {{
+                color: {COLORS['text']}; background-color: {COLORS['white']};
+                border: 1px solid {COLORS['border']}; border-radius: 4px;
+                min-height: 42px; padding: 0 46px 0 14px; font-weight: 650;
+            }}
+            QComboBox#StartupModeCombo:hover {{ border-color: #CED2D1; }}
+            QComboBox#StartupModeCombo:focus {{
+                border: 2px solid {COLORS['blue']};
+                padding-left: 13px;
+            }}
+            QComboBox#StartupModeCombo::drop-down {{
+                subcontrol-origin: padding; subcontrol-position: top right;
+                width: 40px; background-color: {COLORS['panel_alt']};
+                border: none; border-left: 1px solid {COLORS['border']};
+                border-top-right-radius: 4px; border-bottom-right-radius: 4px;
+            }}
+            """
+        )
+        # Stylesheets disable auto-fill during polish. Polish first so the white
+        # surface below is retained on every Windows theme and Qt style.
+        self.startup_mode_combo.ensurePolished()
+        self.startup_mode_combo.setAutoFillBackground(True)
+        combo_palette = self.startup_mode_combo.palette()
+        for role in (
+            QPalette.ColorRole.Window,
+            QPalette.ColorRole.Base,
+            QPalette.ColorRole.Button,
+        ):
+            combo_palette.setColor(role, QColor(COLORS["white"]))
+        combo_palette.setColor(QPalette.ColorRole.Text, QColor(COLORS["text"]))
+        combo_palette.setColor(QPalette.ColorRole.ButtonText, QColor(COLORS["text"]))
+        self.startup_mode_combo.setPalette(combo_palette)
+        popup = self.startup_mode_combo.view()
+        popup.setObjectName("StartupModePopup")
+        popup.setAutoFillBackground(True)
+        popup.viewport().setAutoFillBackground(True)
+        popup.setMouseTracking(True)
+        popup.setItemDelegate(StartupModeItemDelegate(popup))
+        popup.setStyleSheet(
+            f"""
+            QAbstractItemView#StartupModePopup {{
+                color: {COLORS['text']}; background-color: {COLORS['white']};
+                border: 1px solid {COLORS['border']};
+                outline: none; padding: 4px;
+                selection-color: {COLORS['reason_text']};
+                selection-background-color: {COLORS['blue_soft']};
+            }}
+            QAbstractItemView#StartupModePopup::item {{
+                color: {COLORS['text']}; background-color: {COLORS['white']};
+                border: none; min-height: 38px; padding: 0 12px;
+            }}
+            QAbstractItemView#StartupModePopup::item:hover,
+            QAbstractItemView#StartupModePopup::item:selected {{
+                color: {COLORS['reason_text']};
+                background-color: {COLORS['blue_soft']};
+            }}
+            """
+        )
+        popup_palette = popup.palette()
+        popup_palette.setColor(QPalette.ColorRole.Base, QColor(COLORS["white"]))
+        popup_palette.setColor(QPalette.ColorRole.Text, QColor(COLORS["text"]))
+        popup_palette.setColor(
+            QPalette.ColorRole.Highlight,
+            QColor(COLORS["blue_soft"]),
+        )
+        popup_palette.setColor(
+            QPalette.ColorRole.HighlightedText,
+            QColor(COLORS["reason_text"]),
+        )
+        popup.setPalette(popup_palette)
         for mode in StartupWindowMode:
             self.startup_mode_combo.addItem(mode.label, mode.value)
         selected_index = self.startup_mode_combo.findData(
@@ -261,6 +400,113 @@ class SettingsDialog(QDialog):
         action_row.addWidget(self.show_guide_button)
         layout.addLayout(action_row)
         return panel
+
+    def _build_progress_section(self) -> QWidget:
+        panel = ChamferPanel(fill=COLORS["panel"], border=COLORS["border"], chamfer=13)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(12)
+
+        heading = QHBoxLayout()
+        heading.setSpacing(10)
+        icon = QLabel()
+        icon.setPixmap(qta.icon("fa5s.save", color=COLORS["orange"]).pixmap(22, 22))
+        heading.addWidget(icon)
+        title = QLabel("局面与进度")
+        title.setObjectName("SettingsSectionTitle")
+        heading.addWidget(title)
+        heading.addStretch(1)
+        self.restore_session_state_label = QLabel()
+        heading.addWidget(self.restore_session_state_label)
+        layout.addLayout(heading)
+
+        description = QLabel(
+            "程序会持续保存最近一次真实局面。可以选择启动时是否询问恢复，也可以把当前局面另存为独立文件。"
+        )
+        description.setObjectName("SettingsDescription")
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        self.restore_session_toggle = QPushButton()
+        self.restore_session_toggle.setObjectName("SettingsToggleButton")
+        self.restore_session_toggle.setCheckable(True)
+        self.restore_session_toggle.setAccessibleName("启动时恢复上次局面")
+        self.restore_session_toggle.setChecked(
+            self.preferences.restore_last_session_enabled
+        )
+        self.restore_session_toggle.toggled.connect(self._set_restore_session_enabled)
+        restore_row = QHBoxLayout()
+        restore_row.addStretch(1)
+        restore_row.addWidget(self.restore_session_toggle)
+        layout.addLayout(restore_row)
+        self._refresh_restore_session_state()
+
+        actions = QHBoxLayout()
+        actions.setSpacing(8)
+        self.save_progress_button = QPushButton("保存当前局面")
+        self.save_progress_button.setObjectName("GuideButton")
+        self.save_progress_button.setAccessibleName("把当前局面保存到文件")
+        self.save_progress_button.setEnabled(self.has_active_session)
+        self.save_progress_button.clicked.connect(self._request_save_progress)
+        actions.addWidget(self.save_progress_button)
+
+        self.load_progress_button = QPushButton("载入局面")
+        self.load_progress_button.setObjectName("GuideButton")
+        self.load_progress_button.setAccessibleName("从文件载入局面")
+        self.load_progress_button.clicked.connect(self._request_load_progress)
+        actions.addWidget(self.load_progress_button)
+
+        self.clear_progress_button = QPushButton("清除当前进度")
+        self.clear_progress_button.setObjectName("DangerButton")
+        self.clear_progress_button.setAccessibleName("清除当前局面和自动保存")
+        self.clear_progress_button.setEnabled(
+            self.has_active_session
+            or (self.session_store is not None and self.session_store.has_autosave())
+        )
+        self.clear_progress_button.clicked.connect(self._request_clear_progress)
+        actions.addWidget(self.clear_progress_button)
+        layout.addLayout(actions)
+        return panel
+
+    def _set_restore_session_enabled(self, enabled: bool) -> None:
+        self.preferences.set_restore_last_session_enabled(enabled)
+        self._refresh_restore_session_state()
+        self.feedback_label.setText("自动恢复设置已保存。")
+        self.feedback_label.setStyleSheet(f"color: {COLORS['blue_hover']};")
+
+    def _refresh_restore_session_state(self) -> None:
+        enabled = self.restore_session_toggle.isChecked()
+        self.restore_session_toggle.setText(
+            "启动时询问恢复已开启" if enabled else "启动时不询问恢复"
+        )
+        toggle_foreground = COLORS["white"] if enabled else COLORS["blue_hover"]
+        toggle_background = COLORS["blue"] if enabled else COLORS["white"]
+        toggle_hover = COLORS["blue_hover"] if enabled else COLORS["blue_soft"]
+        self.restore_session_toggle.setStyleSheet(
+            f"QPushButton {{ color: {toggle_foreground}; "
+            f"background-color: {toggle_background}; border: 1px solid {COLORS['blue']}; "
+            "border-radius: 4px; min-height: 40px; padding: 0 16px; font-weight: 700; }} "
+            f"QPushButton:hover {{ background-color: {toggle_hover}; }}"
+        )
+        self.restore_session_state_label.setText("已开启" if enabled else "已关闭")
+        foreground = COLORS["blue_hover"] if enabled else COLORS["muted"]
+        background = COLORS["blue_soft"] if enabled else COLORS["panel_alt"]
+        self.restore_session_state_label.setStyleSheet(
+            f"color: {foreground}; background: {background}; border-radius: 4px; "
+            "padding: 4px 8px; font-size: 11px; font-weight: 700;"
+        )
+
+    def _request_save_progress(self) -> None:
+        self.save_progress_requested = True
+        self.accept()
+
+    def _request_load_progress(self) -> None:
+        self.load_progress_requested = True
+        self.accept()
+
+    def _request_clear_progress(self) -> None:
+        self.clear_progress_requested = True
+        self.accept()
 
     def _request_guide(self) -> None:
         self.guide_requested = True

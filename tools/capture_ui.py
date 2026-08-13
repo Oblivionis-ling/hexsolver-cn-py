@@ -4,6 +4,8 @@ import argparse
 import time
 from pathlib import Path
 
+from PySide6.QtCore import QPoint
+from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QApplication
 
 from hexsolver_cn.app import MainWindow
@@ -11,6 +13,7 @@ from hexsolver_cn.models import CellVisualType
 from hexsolver_cn.preferences import AppPreferences
 from hexsolver_cn.reason_interaction import ReasonReferenceKind
 from hexsolver_cn.settings_dialog import SettingsDialog
+from hexsolver_cn.session_store import SessionStore
 from hexsolver_cn.theme import app_stylesheet
 
 
@@ -26,10 +29,13 @@ def main() -> None:
     parser.add_argument("--difficulty", choices=("easy", "hard"), default="hard")
     parser.add_argument("--generation-timeout", type=float, default=180.0)
     parser.add_argument("--settings", action="store_true")
+    parser.add_argument("--open-startup-dropdown", action="store_true")
     parser.add_argument("--manual-state", choices=("hidden", "blue", "black"))
     parser.add_argument("--original-mouse-controls", action="store_true")
     parser.add_argument("--pin-reason-reference", choices=("row", "array"))
     args = parser.parse_args()
+    if args.open_startup_dropdown and not args.settings:
+        parser.error("--open-startup-dropdown requires --settings")
 
     app = QApplication.instance() or QApplication([])
     app.setStyle("Fusion")
@@ -38,7 +44,13 @@ def main() -> None:
     preferences = AppPreferences(persistent=False)
     if args.original_mouse_controls:
         preferences.set_original_mouse_controls_enabled(True)
-    window = MainWindow(preferences=preferences)
+    capture_session_store = SessionStore(
+        args.output.parent / ".capture-session"
+    )
+    window = MainWindow(
+        preferences=preferences,
+        session_store=capture_session_store,
+    )
     window.setFixedSize(args.width, args.height)
     window.show()
     app.processEvents()
@@ -56,11 +68,19 @@ def main() -> None:
     window.stage.board_view.fit_board()
     for _ in range(args.apply_steps):
         window.solve_next_step()
+        deadline = time.monotonic() + 10.0
+        while window._solve_thread is not None and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
         if window.current_move is None:
             raise SystemExit("Solver stopped before the requested capture step.")
         window.apply_current_move()
     if args.suggestion:
         window.solve_next_step()
+        deadline = time.monotonic() + 10.0
+        while window._solve_thread is not None and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
         window.stage.toast.hide()
     app.processEvents()
     if args.pin_reason_reference:
@@ -118,13 +138,32 @@ def main() -> None:
     target = window
     settings_dialog = None
     if args.settings:
-        settings_dialog = SettingsDialog(window.seed_generators.cache, preferences, window)
+        settings_dialog = SettingsDialog(
+            window.seed_generators.cache,
+            preferences,
+            window,
+            session_store=capture_session_store,
+            has_active_session=window._has_active_board,
+        )
         settings_dialog.show()
         app.processEvents()
+        if args.open_startup_dropdown:
+            settings_dialog.startup_mode_combo.showPopup()
+            app.processEvents()
         target = settings_dialog
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    if not target.grab().save(str(args.output), "PNG"):
+    if args.open_startup_dropdown:
+        capture = target.grab()
+        popup_window = settings_dialog.startup_mode_combo.view().window()
+        popup_capture = popup_window.grab()
+        popup_origin = target.mapFromGlobal(popup_window.mapToGlobal(QPoint(0, 0)))
+        painter = QPainter(capture)
+        painter.drawPixmap(popup_origin, popup_capture)
+        painter.end()
+    else:
+        capture = target.grab()
+    if not capture.save(str(args.output), "PNG"):
         raise SystemExit(f"Could not save screenshot: {args.output}")
     print(args.output.resolve())
 

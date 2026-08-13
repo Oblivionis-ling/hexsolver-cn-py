@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import os
 import sys
+from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import qtawesome as qta
 from PySide6.QtCore import QRegularExpression, QSize, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QFont, QRegularExpressionValidator
+from PySide6.QtGui import QAction, QFont, QKeySequence, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
@@ -32,7 +34,8 @@ from .reason_interaction import InteractiveReasonBrowser, ReasonReference
 from .seed_workflow import Difficulty, SeedGeneratorRegistry, SeedRequest
 from .settings_dialog import SettingsDialog
 from .session import BoardStateError, InteractivePuzzleSession
-from .solver import HexReasoningSolver, SolverError
+from .session_store import SESSION_FILE_SUFFIX, SessionStore, SessionStoreError, StoredSession
+from .solver import HexReasoningSolver, SolverCancelled
 from .theme import COLORS, app_stylesheet
 from .widgets import ChamferPanel, HexCounterBadge, StateButton
 
@@ -92,6 +95,31 @@ class SeedGenerationThread(QThread):
         self.succeeded.emit(puzzle)
 
 
+class SolveStepThread(QThread):
+    succeeded = Signal(object, int)
+    failed = Signal(str, int)
+
+    def __init__(
+        self,
+        board: Board,
+        revision: int,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.board = board
+        self.revision = revision
+
+    def run(self) -> None:
+        try:
+            move = HexReasoningSolver(self.isInterruptionRequested).next_step(self.board)
+        except SolverCancelled:
+            return
+        except Exception as exc:
+            self.failed.emit(str(exc), self.revision)
+            return
+        self.succeeded.emit(move, self.revision)
+
+
 class BoardStage(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -127,6 +155,7 @@ class BoardStage(QWidget):
         self.import_button.setIcon(qta.icon("fa5s.image", color=COLORS["faint"]))
         self.import_button.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips, True)
         self.undo_button = self._tool_button("fa5s.undo-alt", "撤销")
+        self.redo_button = self._tool_button("fa5s.redo-alt", "重做")
         self.reset_button = self._tool_button("fa5s.sync-alt", "恢复初始盘面")
         self.zoom_out_button = self._tool_button("fa5s.search-minus", "缩小")
         self.zoom_in_button = self._tool_button("fa5s.search-plus", "放大")
@@ -135,6 +164,7 @@ class BoardStage(QWidget):
         for button in (
             self.import_button,
             self.undo_button,
+            self.redo_button,
             self.reset_button,
             self.zoom_out_button,
             self.zoom_in_button,
@@ -206,6 +236,9 @@ class MainWindow(QMainWindow):
         self,
         seed_generators: SeedGeneratorRegistry | None = None,
         preferences: AppPreferences | None = None,
+        session_store: SessionStore | None = None,
+        *,
+        restore_on_startup: bool = False,
     ) -> None:
         super().__init__()
         self.setWindowTitle("HexInfinite 种子求解器")
@@ -216,6 +249,7 @@ class MainWindow(QMainWindow):
         self.solver = HexReasoningSolver()
         self.seed_generators = seed_generators or build_default_seed_registry()
         self.preferences = preferences or AppPreferences()
+        self.session_store = session_store or SessionStore()
         self.session = InteractivePuzzleSession(build_empty_board(), self.solver)
         self.current_move: Optional[SuggestedMove] = None
         self.current_seed: Optional[SeedRequest] = None
@@ -224,6 +258,14 @@ class MainWindow(QMainWindow):
         self._guide_visible = False
         self._detector: Optional["HexImageDetector"] = None
         self._generation_thread: Optional[SeedGenerationThread] = None
+        self._solve_thread: Optional[SolveStepThread] = None
+        self._session_revision = 0
+        self._solve_busy = False
+        self._close_requested = False
+        self._autosave_error_reported = False
+        self._autosave_timer = QTimer(self)
+        self._autosave_timer.setSingleShot(True)
+        self._autosave_timer.timeout.connect(self._save_autosave_now)
 
         self.root = QWidget()
         self.root.setObjectName("AppRoot")
@@ -246,12 +288,23 @@ class MainWindow(QMainWindow):
 
         self.stage.board_view.cell_activated.connect(self._on_cell_activated)
         self.stage.undo_button.clicked.connect(self.undo)
+        self.stage.redo_button.clicked.connect(self.redo)
         self.stage.reset_button.clicked.connect(self.reset_board)
         self.stage.zoom_in_button.clicked.connect(self.stage.board_view.zoom_in)
         self.stage.zoom_out_button.clicked.connect(self.stage.board_view.zoom_out)
         self.stage.fit_button.clicked.connect(self.stage.board_view.fit_board)
         self.stage.import_button.clicked.connect(self.import_screenshot)
         self.stage.settings_button.clicked.connect(self.open_settings)
+        self.undo_action = QAction("撤销", self)
+        self.undo_action.setShortcut(QKeySequence.StandardKey.Undo)
+        self.undo_action.triggered.connect(self.undo)
+        self.addAction(self.undo_action)
+        self.redo_action = QAction("重做", self)
+        self.redo_action.setShortcuts(
+            (QKeySequence.StandardKey.Redo, QKeySequence("Ctrl+Y"))
+        )
+        self.redo_action.triggered.connect(self.redo)
+        self.addAction(self.redo_action)
 
         self.onboarding_overlay = OnboardingOverlay(
             self.stage,
@@ -302,6 +355,8 @@ class MainWindow(QMainWindow):
             close_guide=False,
         )
         self.show_onboarding()
+        if restore_on_startup:
+            self._restore_autosave_on_startup()
 
     def _build_sidebar(self) -> QWidget:
         sidebar = QWidget()
@@ -455,6 +510,10 @@ class MainWindow(QMainWindow):
         self.step_reason.setFont(reason_font)
         self.step_reason.document().setDefaultFont(reason_font)
         self.step_reason.reference_focus_changed.connect(self._on_reason_reference_focus)
+        self.step_reason.pin_state_changed.connect(self._schedule_autosave)
+        self.step_reason.verticalScrollBar().valueChanged.connect(
+            lambda _value: self._schedule_autosave()
+        )
         layout.addWidget(self.step_reason, 1)
 
         self.step_action_bar = QWidget(panel)
@@ -590,14 +649,17 @@ class MainWindow(QMainWindow):
         self.stage.board_view.setEnabled(enabled)
         for button in (
             self.stage.undo_button,
+            self.stage.redo_button,
             self.stage.reset_button,
             self.stage.zoom_out_button,
             self.stage.zoom_in_button,
             self.stage.fit_button,
         ):
             button.setEnabled(enabled)
-        self.next_button.setEnabled(enabled)
-        self.apply_button.setEnabled(enabled and self.current_move is not None)
+        self.next_button.setEnabled(enabled and not self._solve_busy)
+        self.apply_button.setEnabled(
+            enabled and not self._solve_busy and self.current_move is not None
+        )
         self.stage.counter_badge.setVisible(enabled)
         self._apply_mouse_control_preference()
 
@@ -634,6 +696,7 @@ class MainWindow(QMainWindow):
             return
         if change.before is change.after:
             return
+        self._session_changed()
         self.current_move = None
         self.stage.board_view.set_target(None)
         self.stage.board_view.sync_state()
@@ -641,10 +704,23 @@ class MainWindow(QMainWindow):
         self._update_step_card(None)
 
     def solve_next_step(self) -> None:
-        try:
-            move = self.session.next_step()
-        except SolverError as exc:
-            self.stage.show_toast(f"求解失败：{exc}", danger=True)
+        if self._solve_thread is not None or not self._has_active_board:
+            return
+        revision = self._session_revision
+        thread = SolveStepThread(deepcopy(self.session.board), revision, self)
+        self._solve_thread = thread
+        thread.succeeded.connect(self._solve_succeeded)
+        thread.failed.connect(self._solve_failed)
+        thread.finished.connect(self._solve_finished)
+        self._set_solve_busy(True)
+        thread.start()
+
+    def _solve_succeeded(self, move: object, revision: int) -> None:
+        if revision != self._session_revision or not self._has_active_board:
+            self.stage.show_toast("盘面已变化，已忽略旧的推理结果")
+            return
+        if move is not None and not isinstance(move, SuggestedMove):
+            self.stage.show_toast("求解器返回了无法识别的结果", danger=True)
             return
         self.current_move = move
         self.stage.board_view.set_target(move)
@@ -654,6 +730,32 @@ class MainWindow(QMainWindow):
         else:
             action = "标记蓝色" if move.action is MoveAction.MARK_BLUE else "标记排除"
             self.stage.show_toast(f"已定位：{move.coord} · {action}")
+        self._schedule_autosave()
+
+    def _solve_failed(self, message: str, revision: int) -> None:
+        if revision != self._session_revision:
+            return
+        self.stage.show_toast(f"求解失败：{message}", danger=True, duration_ms=5200)
+
+    def _solve_finished(self) -> None:
+        thread = self._solve_thread
+        self._solve_thread = None
+        self._set_solve_busy(False)
+        if thread is not None:
+            thread.deleteLater()
+        if self._close_requested:
+            QTimer.singleShot(0, self.close)
+
+    def _set_solve_busy(self, busy: bool) -> None:
+        self._solve_busy = busy
+        self.next_button.setText("正在推理…" if busy else "计算下一步")
+        self.next_button.setIcon(
+            qta.icon(
+                "fa5s.circle-notch" if busy else "fa5s.chevron-right",
+                color=COLORS["white"],
+            )
+        )
+        self._refresh_board_interactions()
 
     def apply_current_move(self) -> None:
         if self.current_move is None:
@@ -664,6 +766,7 @@ class MainWindow(QMainWindow):
         except BoardStateError as exc:
             self.stage.show_toast(str(exc), danger=True)
             return
+        self._session_changed()
         self.current_move = None
         self.stage.board_view.set_target(None)
         self.stage.board_view.sync_state()
@@ -675,6 +778,19 @@ class MainWindow(QMainWindow):
         if change is None:
             self.stage.show_toast("没有可以撤销的手动修改")
             return
+        self._session_changed()
+        self.current_move = None
+        self.stage.board_view.set_target(None)
+        self.stage.board_view.sync_state()
+        self._update_counts()
+        self._update_step_card(None)
+
+    def redo(self) -> None:
+        change = self.session.redo()
+        if change is None:
+            self.stage.show_toast("没有可以重做的修改")
+            return
+        self._session_changed()
         self.current_move = None
         self.stage.board_view.set_target(None)
         self.stage.board_view.sync_state()
@@ -683,6 +799,7 @@ class MainWindow(QMainWindow):
 
     def reset_board(self) -> None:
         self.session.reset()
+        self._session_changed()
         self.current_move = None
         self.stage.board_view.set_board(self.session.board)
         self._update_counts()
@@ -729,6 +846,7 @@ class MainWindow(QMainWindow):
             self.solver,
             private_reveals=puzzle.private_reveals,
         )
+        self._session_changed()
         self._load_board(
             self.session.board,
             mode_text=(
@@ -747,6 +865,7 @@ class MainWindow(QMainWindow):
             f"{source}：{len(self.session.board.cells)} 个格子，"
             f"{len(self.session.board.row_clues)} 条行线索"
         )
+        self._save_autosave_now()
 
     def _generation_failed(self, message: str) -> None:
         difficulty = Difficulty.EASY if self.easy_button.isChecked() else Difficulty.HARD
@@ -802,14 +921,206 @@ class MainWindow(QMainWindow):
             return
         self.session = InteractivePuzzleSession(board, self.solver)
         self.current_seed = None
+        self._session_changed()
         self._load_board(board, mode_text=f"截图局面 · {Path(path).name}")
+        self._save_autosave_now()
 
     def open_settings(self) -> None:
-        dialog = SettingsDialog(self.seed_generators.cache, self.preferences, self)
+        dialog = SettingsDialog(
+            self.seed_generators.cache,
+            self.preferences,
+            self,
+            session_store=self.session_store,
+            has_active_session=self._has_active_board,
+        )
         dialog.exec()
         self._apply_mouse_control_preference()
         if dialog.guide_requested:
             self.show_onboarding()
+        elif dialog.save_progress_requested:
+            self.save_progress_as()
+        elif dialog.load_progress_requested:
+            self.load_progress_from_file()
+        elif dialog.clear_progress_requested:
+            self.clear_current_progress()
+
+    def save_progress_as(self) -> None:
+        if not self._has_active_board:
+            self.stage.show_toast("当前没有可保存的局面", danger=True)
+            return
+        default_name = (
+            f"hex-{self.current_seed.difficulty.value}-{self.current_seed.seed:08d}{SESSION_FILE_SUFFIX}"
+            if self.current_seed is not None
+            else f"hex-progress{SESSION_FILE_SUFFIX}"
+        )
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "保存当前局面",
+            str(self.session_store.directory / default_name),
+            f"HexInfinite 局面 (*{SESSION_FILE_SUFFIX});;JSON 文件 (*.json)",
+        )
+        if not path:
+            return
+        if not Path(path).suffix:
+            path += SESSION_FILE_SUFFIX
+        try:
+            self.session_store.save(
+                path,
+                self.session,
+                self.current_seed,
+                self.current_move,
+                self.step_reason.verticalScrollBar().value(),
+                self._pinned_reason_reference_id(),
+            )
+        except SessionStoreError as exc:
+            self.stage.show_toast(str(exc), danger=True, duration_ms=5200)
+            return
+        self.stage.show_toast(f"局面已保存：{Path(path).name}")
+
+    def load_progress_from_file(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "载入局面",
+            str(self.session_store.directory),
+            f"HexInfinite 局面 (*{SESSION_FILE_SUFFIX} *.json)",
+        )
+        if not path:
+            return
+        try:
+            stored = self.session_store.load(path, self.solver)
+        except SessionStoreError as exc:
+            self.stage.show_toast(str(exc), danger=True, duration_ms=6000)
+            return
+        self._apply_stored_session(stored, source="手动存档")
+        self._save_autosave_now()
+
+    def clear_current_progress(self) -> None:
+        answer = QMessageBox.question(
+            self,
+            "清除当前进度",
+            "确定清除当前局面和最近一次自动保存吗？\n\n手动另存的局面文件不会被删除。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.session_store.clear_autosave()
+        except SessionStoreError as exc:
+            self.stage.show_toast(str(exc), danger=True)
+            return
+        self._autosave_timer.stop()
+        self.session = InteractivePuzzleSession(build_empty_board(), self.solver)
+        self.current_seed = None
+        self._session_changed(schedule_autosave=False)
+        self._load_board(
+            self.session.board,
+            mode_text="快速上手 · 尚未生成地图",
+            active=False,
+            close_guide=False,
+        )
+        self.show_onboarding()
+        self.stage.show_toast("当前进度已清除")
+
+    def _restore_autosave_on_startup(self) -> None:
+        if (
+            not self.preferences.restore_last_session_enabled
+            or not self.session_store.has_autosave()
+        ):
+            return
+        answer = QMessageBox.question(
+            self,
+            "继续上一次局面",
+            "检测到上一次保存的局面，是否继续？\n\n选择“否”会放弃该自动保存并显示使用说明。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            try:
+                self.session_store.clear_autosave()
+            except SessionStoreError:
+                pass
+            return
+        try:
+            stored = self.session_store.load_autosave(self.solver)
+        except SessionStoreError as exc:
+            try:
+                self.session_store.clear_autosave()
+            except SessionStoreError:
+                pass
+            self.stage.show_toast(
+                f"自动保存无法恢复，已安全忽略：{exc}",
+                danger=True,
+                duration_ms=6500,
+            )
+            return
+        self._apply_stored_session(stored, source="自动恢复")
+        self.stage.show_toast("已恢复上一次局面")
+
+    def _apply_stored_session(self, stored: StoredSession, *, source: str) -> None:
+        self.session = stored.session
+        self.current_seed = stored.request
+        self.current_move = stored.current_move
+        self._session_changed(schedule_autosave=False, clear_move=False)
+        if stored.request is not None:
+            self.seed_input.setText(f"{stored.request.seed:08d}")
+            if stored.request.difficulty is Difficulty.EASY:
+                self.easy_button.setChecked(True)
+            else:
+                self.hard_button.setChecked(True)
+            mode = (
+                f"种子 {stored.request.seed:08d} · "
+                f"{stored.request.difficulty.label} · {source}"
+            )
+        else:
+            mode = f"已载入局面 · {source}"
+        self._load_board(self.session.board, mode_text=mode, verified=True)
+        self.current_move = stored.current_move
+        self.stage.board_view.set_target(self.current_move)
+        self._update_step_card(self.current_move)
+        self.step_reason.restore_view_state(
+            stored.pinned_reference_id,
+            stored.reason_scroll_value,
+        )
+
+    def _session_changed(
+        self,
+        *,
+        schedule_autosave: bool = True,
+        clear_move: bool = True,
+    ) -> None:
+        self._session_revision += 1
+        if self._solve_thread is not None and self._solve_thread.isRunning():
+            self._solve_thread.requestInterruption()
+        if clear_move:
+            self.current_move = None
+        if schedule_autosave:
+            self._schedule_autosave()
+
+    def _schedule_autosave(self) -> None:
+        if self._has_active_board:
+            self._autosave_timer.start(250)
+
+    def _save_autosave_now(self) -> None:
+        if not self._has_active_board:
+            return
+        try:
+            self.session_store.save_autosave(
+                self.session,
+                self.current_seed,
+                self.current_move,
+                self.step_reason.verticalScrollBar().value(),
+                self._pinned_reason_reference_id(),
+            )
+            self._autosave_error_reported = False
+        except SessionStoreError as exc:
+            if not self._autosave_error_reported:
+                self.stage.show_toast(str(exc), danger=True, duration_ms=5200)
+                self._autosave_error_reported = True
+
+    def _pinned_reason_reference_id(self) -> Optional[str]:
+        reference = self.step_reason.pinned_reference
+        return reference.reference_id if reference is not None else None
 
     def copy_seed(self) -> None:
         QApplication.clipboard().setText(self.seed_input.text())
@@ -856,6 +1167,14 @@ class MainWindow(QMainWindow):
             self.stage.show_toast("离线地图仍在生成，请完成后再关闭窗口。", danger=True)
             event.ignore()
             return
+        if self._solve_thread is not None and self._solve_thread.isRunning():
+            self._close_requested = True
+            self._solve_thread.requestInterruption()
+            self.stage.show_toast("正在安全结束本次推理，完成后会自动关闭…")
+            event.ignore()
+            return
+        self._autosave_timer.stop()
+        self._save_autosave_now()
         super().closeEvent(event)
 
 
@@ -867,6 +1186,6 @@ def run_app() -> None:
     app.setStyle("Fusion")
     app.setStyleSheet(app_stylesheet())
     preferences = AppPreferences()
-    window = MainWindow(preferences=preferences)
+    window = MainWindow(preferences=preferences, restore_on_startup=True)
     show_window_for_startup(window, preferences.startup_window_mode)
     app.exec()

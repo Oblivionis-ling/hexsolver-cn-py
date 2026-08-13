@@ -6,7 +6,7 @@ import traceback
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QColor, QFont, QTextCursor
+from PySide6.QtGui import QColor, QFont, QPalette, QTextCursor
 from PySide6.QtWidgets import QApplication
 
 from .app import (
@@ -22,6 +22,7 @@ from .reason_interaction import ReasonReferenceKind
 from .seed_workflow import Difficulty, SeedRequest
 from .settings_dialog import SettingsDialog
 from .session import InteractivePuzzleSession
+from .session_store import SessionStore
 from .theme import app_stylesheet
 
 
@@ -110,6 +111,51 @@ def _verify_manual_outline_colors(window: MainWindow, app: QApplication) -> None
             raise RuntimeError(f"手动标记 {state.value} 没有实际绘制选中轮廓。")
     window.state_buttons[CellVisualType.HIDDEN].click()
     app.processEvents()
+
+
+def _verify_startup_mode_dropdown(settings: SettingsDialog, app: QApplication) -> None:
+    combo = settings.startup_mode_combo
+    popup = combo.view()
+    if popup.isVisible() or combo.count() != len(StartupWindowMode):
+        raise RuntimeError("启动窗口选择器没有保持折叠下拉状态。")
+    if (
+        popup.palette().color(QPalette.ColorRole.Base) != QColor("#FFFFFF")
+        or popup.palette().color(QPalette.ColorRole.Text) != QColor("#3C3E40")
+    ):
+        raise RuntimeError("启动窗口下拉菜单没有使用白底深色文字。")
+
+    combo.showPopup()
+    app.processEvents()
+    if not popup.isVisible():
+        raise RuntimeError("启动窗口下拉菜单无法展开。")
+    image = popup.viewport().grab().toImage()
+    light_pixels = 0
+    dark_surface_pixels = 0
+    selected_pixels = 0
+    for x in range(image.width()):
+        for y in range(image.height()):
+            color = image.pixelColor(x, y)
+            if color.red() >= 220 and color.green() >= 220 and color.blue() >= 220:
+                light_pixels += 1
+            if color.red() <= 70 and color.green() <= 70 and color.blue() <= 70:
+                dark_surface_pixels += 1
+            if (
+                abs(color.red() - 221) <= 3
+                and abs(color.green() - 244) <= 3
+                and abs(color.blue() - 252) <= 3
+            ):
+                selected_pixels += 1
+    pixel_count = image.width() * image.height()
+    if (
+        light_pixels <= pixel_count * 0.65
+        or dark_surface_pixels >= pixel_count * 0.12
+        or selected_pixels <= pixel_count * 0.20
+    ):
+        raise RuntimeError("启动窗口下拉菜单未正确渲染白底、浅蓝选中态，或仍存在深色大块。")
+    combo.hidePopup()
+    app.processEvents()
+    if popup.isVisible():
+        raise RuntimeError("启动窗口下拉菜单选择后没有恢复折叠状态。")
 
 
 def _verify_reason_interactions(window: MainWindow, app: QApplication) -> None:
@@ -202,7 +248,14 @@ def run_package_smoke_test() -> int:
         registry = build_default_seed_registry()
         _write_progress("registry-ok")
         preferences = AppPreferences(persistent=False)
-        window = MainWindow(seed_generators=registry, preferences=preferences)
+        session_store = SessionStore(
+            os.environ.get("HEXSOLVER_CACHE_DIR") or None
+        )
+        window = MainWindow(
+            seed_generators=registry,
+            preferences=preferences,
+            session_store=session_store,
+        )
         _write_progress("window-created")
         if window.minimumSize() != QSize(1120, 760) or window.size() != QSize(1440, 1024):
             raise RuntimeError("打包窗口初始尺寸与源码版不一致。")
@@ -250,7 +303,15 @@ def run_package_smoke_test() -> int:
             or not window.stage.settings_button.accessibleName()
         ):
             raise RuntimeError("打包界面缺少可访问的设置入口。")
-        settings = SettingsDialog(registry.cache, preferences, window)
+        settings = SettingsDialog(
+            registry.cache,
+            preferences,
+            window,
+            session_store=session_store,
+            has_active_session=window._has_active_board,
+        )
+        settings.show()
+        app.processEvents()
         if registry.cache is None or settings.cache_path_value.text() != str(
             registry.cache.directory
         ):
@@ -260,6 +321,7 @@ def run_package_smoke_test() -> int:
             != StartupWindowMode.MAXIMIZED.value
         ):
             raise RuntimeError("设置页没有显示默认的有窗口最大化启动模式。")
+        _verify_startup_mode_dropdown(settings, app)
         fullscreen_index = settings.startup_mode_combo.findData(
             StartupWindowMode.FULLSCREEN.value
         )
@@ -273,6 +335,12 @@ def run_package_smoke_test() -> int:
         settings.startup_mode_combo.setCurrentIndex(maximized_index)
         if not settings.show_guide_button.accessibleName():
             raise RuntimeError("设置页缺少重新查看使用说明的可访问入口。")
+        if (
+            not settings.restore_session_toggle.isChecked()
+            or settings.save_progress_button.isEnabled()
+            or not settings.load_progress_button.isEnabled()
+        ):
+            raise RuntimeError("设置页局面保存、载入或自动恢复初始状态错误。")
         settings.show_guide_button.click()
         if not settings.guide_requested:
             raise RuntimeError("设置页没有发出重新查看使用说明的请求。")
@@ -297,6 +365,21 @@ def run_package_smoke_test() -> int:
         app.processEvents()
         if window._guide_visible or not window.next_button.isEnabled():
             raise RuntimeError("生成真实种子盘面后使用说明没有自动收起。")
+        if not window.stage.redo_button.accessibleName():
+            raise RuntimeError("打包界面缺少重做入口。")
+        progress_coord = window.session.board.hidden_cells()[0].coord
+        window.session.set_cell_state(progress_coord, CellVisualType.BLACK)
+        if window.session.undo() is None or window.session.redo() is None:
+            raise RuntimeError("打包界面的撤销/重做链路不可用。")
+        window.current_seed = preview.request
+        window._save_autosave_now()
+        restored = session_store.load_autosave(window.solver)
+        if (
+            restored.request != preview.request
+            or restored.session.board.get_cell(progress_coord).visual_type
+            is not CellVisualType.BLACK
+        ):
+            raise RuntimeError("打包版自动保存没有完整恢复当前局面。")
         _verify_manual_outline_colors(window, app)
         row_items = window.stage.board_view.row_clue_items
         if len(row_items) != len(window.session.board.row_clues) or not all(
@@ -305,7 +388,13 @@ def run_package_smoke_test() -> int:
             raise RuntimeError("打包界面没有保持所有行线索可见。")
         _verify_reason_interactions(window, app)
 
-        settings = SettingsDialog(registry.cache, preferences, window)
+        settings = SettingsDialog(
+            registry.cache,
+            preferences,
+            window,
+            session_store=session_store,
+            has_active_session=window._has_active_board,
+        )
         if settings.original_mouse_controls_toggle.isChecked():
             raise RuntimeError("原版鼠标操作没有保持兼容性的默认关闭状态。")
         settings.original_mouse_controls_toggle.click()
