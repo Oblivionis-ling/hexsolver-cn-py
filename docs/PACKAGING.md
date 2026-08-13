@@ -2,16 +2,16 @@
 
 ## 目标
 
-`0.7.4` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享同一套版本化种子缓存实现。本版只把设置页的启动窗口控件改为默认折叠的白底下拉选择器；求解、地图生成、缓存、解释模板和三种启动模式语义保持不变。
+`0.8.0` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享版本化种子缓存与局面存档实现。本版加入后台推理、撤销/重做、自动恢复和手动存档；求解规则、地图生成和解释模板保持不变。
 
 发布资产：
 
 ```text
-HexInfiniteSolver-0.7.4-windows-x64.exe
-HexInfiniteSolver-0.7.4-windows-x64.exe.sha256
+HexInfiniteSolver-0.8.0-windows-x64.exe
+HexInfiniteSolver-0.8.0-windows-x64.exe.sha256
 ```
 
-2026-08-08 已验证 `0.7.4` 发布成品：96,518,191 字节（92.05 MiB），SHA-256 为 `1d14b16aa9948b71dc8d66fcf44dc4c4598d47402f46e97b0e4013de90ab908d`。Windows 版本资源中的 FileVersion 和 ProductVersion 均为 `0.7.4`。
+最终冻结成品为 96,539,892 字节（92.07 MiB），FileVersion/ProductVersion 均为 `0.8.0`，SHA-256 为 `48570b61db4ecc64ce9b33932747fe8f3d02eb96599fd19a8d09c499a7d0d004`。
 
 ## 成品包含什么
 
@@ -20,9 +20,9 @@ HexInfiniteSolver-0.7.4-windows-x64.exe.sha256
 - Hard 纯 Python 生成器。
 - 项目自有的 `HexcellsHeadless.exe`、`UnityEngine.dll` 和 `TextMeshPro-5.6-Runtime.dll` 最小兼容宿主。
 - Qt 插件、字体图标、应用图标和 Windows 版本资源。
-- 种子缓存、用户体验偏好与设置页；缓存数据和 Qt 用户设置在运行时写入用户目录，不会预置在 EXE 中。
+- 种子缓存、局面存档、用户体验偏好与设置页；运行时用户数据不会预置在 EXE 中。
 
-截图入口当前关闭，因此 0.7.4 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
+截图入口当前关闭，因此 0.8.0 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
 
 ## 成品不包含什么
 
@@ -68,6 +68,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 - 生成行名称与坐标组富文本引用，核对解释原文不变、锚点存在且无悬停提示框、行线索与双层覆盖同步高亮、预览/固定分别使用虚线/实线、点击固定后文字加粗，并确认换理由会清理固定状态；
 - 核对全部行线索存在、可见并位于棋盘格上层；
 - 核对右下角设置入口可访问，设置页显示真实缓存目录、三种启动窗口模式、使用说明入口和鼠标操作开关；
+- 核对局面自动恢复开关、保存/载入/清除入口、重做按钮，以及存档写入后恢复种子与格子状态；
 - 真实展开启动窗口下拉菜单，核对折叠态、白底深色文字调色板、白底实际像素比例、无深色大块和选择后收起行为；
 - 持久化切换启动窗口模式，重新打开说明，并在装载真实 Hard seed 1 后确认说明自动收起、棋盘操作恢复；
 - 核对单文件内的三个 Easy 托管宿主文件；

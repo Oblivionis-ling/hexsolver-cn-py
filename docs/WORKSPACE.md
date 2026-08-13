@@ -24,14 +24,14 @@ F:\SteamLibrary\steamapps\common\Hexcells Infinite
 - Python 应用、Hard 纯 Python 生成器和 Easy 无 Unity 托管宿主源码；
 - 一键启动、依赖、诊断和测试；
 - `tests/fixtures/` 中两个小型结构化 TSV 回归夹具；
-- `docs/images/` 中两张生成结果证据，以及 `docs/design/` 中当前启动说明与 0.7.4 白底下拉选择器界面证据；
+- `docs/images/` 中两张生成结果证据，以及 `docs/design/` 中当前启动说明、白底下拉选择器和 0.8.0 局面进度界面证据；
 - 开发历史、算法、路线、设计验收和研究资料。
 
 以下内容有用但只保留在本地，并由 `.gitignore` 排除：
 
 - `.conda_env/`：当前一键启动环境，可由 `run.ps1` 重建；
 - `managed_core/bin/`：Easy 托管核心构建产物，可由 `managed_core/build.ps1` 重建；
-- `dist/`：只保留最新 0.7.4 单文件成品与 SHA-256；
+- `dist/`：只保留最新 0.8.0 单文件成品与 SHA-256；
 - `build/`：PyInstaller 中间目录，发布验证后删除，需要时可由 `packaging/build_app.ps1` 重建；
 - `tests/images/`、`tests/labels/`：含原版游戏截图的 OCR 本地数据；
 - `tests/reports/`：临时视觉 QA 输出；
@@ -117,6 +117,12 @@ Easy 托管核心的真实集成校验仍需要合法安装中的 `Assembly-CSha
 - 启动窗口设置改为默认折叠的白底下拉选择器，不再继承系统深色弹出表面。
 - `docs/design/` 以 0.7.4 原生 Windows Qt 展开截图替换旧设置页证据；0.7.3 启动说明截图继续作为当前未改动功能的视觉证据。
 - 源码、版本资源、单文件成品与 Release 文件名统一为 `0.7.4`；本地 `dist/` 和 GitHub Release 继续只保留最新正式版。
+
+## 2026-08-14 0.8.0 更新
+
+- `docs/design/` 增加局面与进度设置的原生 Windows Qt 证据，保留仍有效的启动说明与白底下拉菜单截图。
+- 新增的自动存档默认写入 `%LOCALAPPDATA%\HexInfiniteSolver\sessions`，不进入仓库；测试、截图工具和成品冒烟均使用独立临时目录。
+- 本地 `dist/` 与 GitHub Release 仍只保留最新正式版；完成冻结构建后以 0.8.0 EXE 和 SHA-256 替换 0.7.4 资产。
 - 三种启动模式、持久化、求解器、生成器、缓存格式和私有答案隔离没有变化。
 
 ## 清理原则

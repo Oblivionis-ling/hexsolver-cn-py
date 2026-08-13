@@ -11,9 +11,10 @@
 - [`../images/easy-seed1.png`](../images/easy-seed1.png)：Easy seed 1，226 格大盘与初始公开信息。
 - [`ui-v073-onboarding.png`](ui-v073-onboarding.png)：0.7.3 在 `1440 × 1024` Windows Qt 窗口中的空盘启动状态，四组手绘箭头分别指向种子生成、手动同步、下一步推理和设置入口。
 - [`ui-v074-settings-dropdown.png`](ui-v074-settings-dropdown.png)：0.7.4 设置页的启动窗口下拉菜单已展开，显示白底、深色文字、浅蓝当前项和三个完整选项。
+- [`ui-v080-settings-progress-native.png`](ui-v080-settings-progress-native.png)：0.8.0 设置页局面与进度卡，显示自动恢复状态、手动保存/载入和清除进度入口。
 - Onboarding implementation pixels: `1440 × 1024` at device pixel ratio `1.0`.
 - 0.7.4 settings evidence pixels: `1440 × 1200`; logical dialog viewport: `720 × 600` at device pixel ratio `2.0`.
-- 仓库保留功能未变的 0.7.3 启动说明和 0.7.4 白底下拉菜单作为当前应用界面证据；0.7.1 的分层联动高亮继续由自动回归、成品冒烟和下方历史记录验证。
+- 仓库保留 0.7.3 启动说明、0.7.4 白底下拉菜单和 0.8.0 局面进度卡作为当前应用界面证据；0.7.1 的分层联动高亮继续由自动回归、成品冒烟和下方历史记录验证。
 
 **Normalized comparison**
 
@@ -142,6 +143,12 @@ The current Hard runtime capture now shows the same intended content class as th
 - 弹出列表通过 QSS、`QPalette` 和专用 item delegate 共同约束为白底深色文字，当前/悬停项使用浅蓝底与深青文字，并去除系统深色大块和粗重焦点框。
 - 原生 Windows Qt 截图人工检查了白底、三项文字、浅蓝当前项、首屏层级和原有橙/青/炭灰风格；回归测试另外核对默认折叠、展开/收起、调色板与实际像素比例。
 
+### Pass 14 (`0.8.0`)
+
+- 设置页在启动窗口下方增加“局面与进度”卡片；自动恢复使用青色按钮与浅青状态徽标，手动保存/载入使用蓝色轮廓，清除进度使用红色轮廓。
+- 无活动局面时保存与清除按钮具有明确灰色禁用态，载入入口保持可用；滚动结构和固定“完成”按钮不变。
+- 原生 Windows Qt 截图确认文字对比度、按钮层级、卡片间距和 1440 × 1024 首屏滚动位置正常。
+
 ## Implementation checklist
 
 - [x] Selected direction 2 reproduced as a functional two-column desktop UI.
@@ -152,13 +159,14 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Easy seed 1 dense-board capture passed visual inspection.
 - [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
 - [x] 0.7.3 onboarding and 0.7.4 white startup dropdown passed native Windows Qt visual inspection at their recorded logical sizes and device pixel ratios.
-- [x] Seventy-four automated core, cache, bridge, solver and Qt workflow tests pass.
+- [x] Eighty-four automated core, cache, bridge, solver, session-store and Qt workflow tests pass.
 - [x] Full-screen long-reason bottom capture and end-cursor visibility check pass.
 - [x] Hidden, blue and excluded buttons render black, orange and blue active outlines respectively.
 - [x] Original-style mouse controls persist, map real left/right clicks, toggle back to unknown, and restore manual tools when disabled.
 - [x] Row names, individual coordinates and long coordinate arrays link to the correct board elements; hover, pin, keyboard activation and state cleanup pass.
 - [x] Startup is empty and maximized by default; all three window modes persist, the guide can close/reopen, and a verified seed board automatically dismisses it.
 - [x] The apply-suggestion button has no tooltip and retains an accessible name and description.
+- [x] Progress settings, save/load/clear actions and the restore-state badge remain legible on native Windows Qt.
 - [x] No actionable P0/P1/P2 visual findings remain.
 
 final result: passed

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -31,9 +32,10 @@ from hexsolver_cn.reason_interaction import (  # noqa: E402
     parse_reason_references,
 )
 from hexsolver_cn.seed_cache import SeedResultCache  # noqa: E402
-from hexsolver_cn.seed_workflow import Difficulty, SeedGeneratorRegistry  # noqa: E402
+from hexsolver_cn.seed_workflow import Difficulty, SeedGeneratorRegistry, SeedRequest  # noqa: E402
 from hexsolver_cn.settings_dialog import SettingsDialog  # noqa: E402
 from hexsolver_cn.session import InteractivePuzzleSession  # noqa: E402
+from hexsolver_cn.session_store import SessionStore  # noqa: E402
 
 
 class FixtureRunner:
@@ -58,6 +60,7 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.window = MainWindow(
             seed_generators=SeedGeneratorRegistry(),
             preferences=self.preferences,
+            session_store=SessionStore(self.preferences_directory.name),
         )
         self.window.session = InteractivePuzzleSession(
             build_demo_board(),
@@ -102,6 +105,10 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.assertEqual("", self.window.apply_button.toolTip())
         self.assertEqual("应用当前建议", self.window.apply_button.accessibleName())
         self.window.solve_next_step()
+        deadline = time.monotonic() + 3.0
+        while self.window._solve_thread is not None and time.monotonic() < deadline:
+            self.app.processEvents()
+            time.sleep(0.01)
         move = self.window.current_move
         self.assertIsNotNone(move)
         assert move is not None
@@ -115,10 +122,110 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.assertIsNone(self.window.current_move)
         self.assertEqual(move.coord, self.window.session.history[-1].coord)
 
+    def test_solve_runs_off_ui_thread_and_ignores_stale_result(self) -> None:
+        started = threading.Event()
+        release = threading.Event()
+        stale_move = SuggestedMove(
+            (1, 0),
+            MoveAction.MARK_BLUE,
+            "过期结果",
+            "局部必然",
+        )
+
+        def delayed_next_step(_solver, _board):  # type: ignore[no-untyped-def]
+            started.set()
+            release.wait(2.0)
+            return stale_move
+
+        with patch(
+            "hexsolver_cn.app.HexReasoningSolver.next_step",
+            autospec=True,
+            side_effect=delayed_next_step,
+        ):
+            self.window.solve_next_step()
+            deadline = time.monotonic() + 2.0
+            while not started.is_set() and time.monotonic() < deadline:
+                self.app.processEvents()
+                time.sleep(0.01)
+            self.assertTrue(started.is_set())
+            self.assertTrue(self.window._solve_busy)
+            self.assertEqual("正在推理…", self.window.next_button.text())
+
+            self.window._select_state(CellVisualType.BLACK)
+            self.window._on_cell_activated((1, 0))
+            release.set()
+            deadline = time.monotonic() + 3.0
+            while self.window._solve_thread is not None and time.monotonic() < deadline:
+                self.app.processEvents()
+                time.sleep(0.01)
+
+        self.assertIsNone(self.window._solve_thread)
+        self.assertIsNone(self.window.current_move)
+        self.assertFalse(self.window._solve_busy)
+
+    def test_redo_button_and_shortcut_restore_undone_mark(self) -> None:
+        coord = next(cell.coord for cell in self.window.session.board.hidden_cells())
+        self.window._select_state(CellVisualType.BLACK)
+        self.window._on_cell_activated(coord)
+        changed = self.window.session.board.get_cell(coord).visual_type
+        self.window.undo()
+        self.assertIs(CellVisualType.HIDDEN, self.window.session.board.get_cell(coord).visual_type)
+
+        self.window.redo_action.trigger()
+        self.assertIs(changed, self.window.session.board.get_cell(coord).visual_type)
+        self.assertEqual("重做", self.window.stage.redo_button.accessibleName())
+
+    def test_autosave_restores_session_when_user_accepts(self) -> None:
+        self.window.current_seed = SeedRequest(17, Difficulty.HARD)
+        self.window._select_state(CellVisualType.BLACK)
+        self.window._on_cell_activated((1, 0))
+        self.window._save_autosave_now()
+
+        with patch(
+            "hexsolver_cn.app.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ):
+            restored = MainWindow(
+                seed_generators=SeedGeneratorRegistry(),
+                preferences=self.preferences,
+                session_store=SessionStore(self.preferences_directory.name),
+                restore_on_startup=True,
+            )
+        try:
+            self.assertEqual(SeedRequest(17, Difficulty.HARD), restored.current_seed)
+            self.assertIs(
+                CellVisualType.BLACK,
+                restored.session.board.get_cell((1, 0)).visual_type,
+            )
+            self.assertFalse(restored._guide_visible)
+            self.assertIn("自动恢复", restored.stage.mode_chip.text())
+        finally:
+            restored.close()
+
+    def test_autosave_decline_discards_progress_and_keeps_guide(self) -> None:
+        self.window._save_autosave_now()
+        with patch(
+            "hexsolver_cn.app.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.No,
+        ):
+            fresh = MainWindow(
+                seed_generators=SeedGeneratorRegistry(),
+                preferences=self.preferences,
+                session_store=SessionStore(self.preferences_directory.name),
+                restore_on_startup=True,
+            )
+        try:
+            self.assertFalse(fresh._has_active_board)
+            self.assertTrue(fresh._guide_visible)
+            self.assertFalse(fresh.session_store.has_autosave())
+        finally:
+            fresh.close()
+
     def test_fresh_window_uses_guide_instead_of_demo_board(self) -> None:
         fresh = MainWindow(
             seed_generators=SeedGeneratorRegistry(),
             preferences=self.preferences,
+            session_store=SessionStore(self.preferences_directory.name),
         )
         fresh.show()
         self.app.processEvents()
@@ -710,7 +817,11 @@ class QtAppWorkflowTests(unittest.TestCase):
         registry = SeedGeneratorRegistry()
         registry.register(OriginalRuntimeHardBackend(FixtureRunner(text)))
         self.window.close()
-        self.window = MainWindow(seed_generators=registry, preferences=self.preferences)
+        self.window = MainWindow(
+            seed_generators=registry,
+            preferences=self.preferences,
+            session_store=SessionStore(self.preferences_directory.name),
+        )
         self.window.easy_button.setChecked(False)
         self.window.hard_button.setChecked(True)
         self.window.seed_input.setText("1")

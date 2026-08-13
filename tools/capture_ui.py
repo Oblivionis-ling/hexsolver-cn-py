@@ -13,6 +13,7 @@ from hexsolver_cn.models import CellVisualType
 from hexsolver_cn.preferences import AppPreferences
 from hexsolver_cn.reason_interaction import ReasonReferenceKind
 from hexsolver_cn.settings_dialog import SettingsDialog
+from hexsolver_cn.session_store import SessionStore
 from hexsolver_cn.theme import app_stylesheet
 
 
@@ -43,7 +44,13 @@ def main() -> None:
     preferences = AppPreferences(persistent=False)
     if args.original_mouse_controls:
         preferences.set_original_mouse_controls_enabled(True)
-    window = MainWindow(preferences=preferences)
+    capture_session_store = SessionStore(
+        args.output.parent / ".capture-session"
+    )
+    window = MainWindow(
+        preferences=preferences,
+        session_store=capture_session_store,
+    )
     window.setFixedSize(args.width, args.height)
     window.show()
     app.processEvents()
@@ -61,11 +68,19 @@ def main() -> None:
     window.stage.board_view.fit_board()
     for _ in range(args.apply_steps):
         window.solve_next_step()
+        deadline = time.monotonic() + 10.0
+        while window._solve_thread is not None and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
         if window.current_move is None:
             raise SystemExit("Solver stopped before the requested capture step.")
         window.apply_current_move()
     if args.suggestion:
         window.solve_next_step()
+        deadline = time.monotonic() + 10.0
+        while window._solve_thread is not None and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
         window.stage.toast.hide()
     app.processEvents()
     if args.pin_reason_reference:
@@ -123,7 +138,13 @@ def main() -> None:
     target = window
     settings_dialog = None
     if args.settings:
-        settings_dialog = SettingsDialog(window.seed_generators.cache, preferences, window)
+        settings_dialog = SettingsDialog(
+            window.seed_generators.cache,
+            preferences,
+            window,
+            session_store=capture_session_store,
+            has_active_session=window._has_active_board,
+        )
         settings_dialog.show()
         app.processEvents()
         if args.open_startup_dropdown:

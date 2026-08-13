@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from ortools.sat.python import cp_model
 
@@ -43,6 +43,10 @@ class SolverError(RuntimeError):
     pass
 
 
+class SolverCancelled(SolverError):
+    pass
+
+
 class HexReasoningSolver:
     SOURCE_PRIORITY = {
         "局部必然": 0,
@@ -51,6 +55,14 @@ class HexReasoningSolver:
         "全局剩余": 3,
         "全局求解": 4,
     }
+
+    def __init__(self, cancel_requested: Optional[Callable[[], bool]] = None) -> None:
+        self._cancel_requested = cancel_requested or (lambda: False)
+
+    def _check_cancelled(self) -> None:
+        cancel_requested = getattr(self, "_cancel_requested", None)
+        if cancel_requested is not None and cancel_requested():
+            raise SolverCancelled("推理已取消。")
 
     def solve(self, board: Board) -> List[SuggestedMove]:
         local_moves = self._collect_local_moves(board)
@@ -62,6 +74,7 @@ class HexReasoningSolver:
         """Return one deterministic, most explainable forced move."""
 
         for tier_moves in self._collect_local_move_tiers(board):
+            self._check_cancelled()
             if tier_moves:
                 return sorted(tier_moves.values(), key=self._move_sort_key)[0]
         global_moves = self._collect_global_forced_moves(board, limit=1)
@@ -326,7 +339,9 @@ class HexReasoningSolver:
         forced_moves: List[SuggestedMove] = []
         hidden_cells = sorted(board.hidden_cells(), key=lambda cell: (cell.coord[1], cell.coord[0]))
         for cell in hidden_cells:
+            self._check_cancelled()
             can_blue = self._solve_with_assumption(board, cell.coord, True)
+            self._check_cancelled()
             can_black = self._solve_with_assumption(board, cell.coord, False)
             if can_blue and can_black:
                 continue
@@ -357,6 +372,7 @@ class HexReasoningSolver:
         board: Board,
         assumption: Optional[Tuple[Coord, bool]] = None,
     ) -> Tuple[bool, Dict[Coord, int]]:
+        self._check_cancelled()
         model = cp_model.CpModel()
         variables: Dict[Coord, cp_model.IntVar] = {}
         for cell in board.hidden_cells():
@@ -373,6 +389,7 @@ class HexReasoningSolver:
         solver.parameters.max_time_in_seconds = 5.0
         solver.parameters.num_search_workers = 8
         status = solver.Solve(model)
+        self._check_cancelled()
         if status == cp_model.INFEASIBLE:
             return False, {}
         if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
@@ -391,6 +408,7 @@ class HexReasoningSolver:
     ) -> Tuple[List[ConstraintSpec], bool]:
         """Return a sufficient (not necessarily minimum) infeasible constraint core."""
 
+        self._check_cancelled()
         model = cp_model.CpModel()
         variables: Dict[Coord, cp_model.IntVar] = {
             cell.coord: model.NewBoolVar(f"cell_{cell.coord[0]}_{cell.coord[1]}")
@@ -424,6 +442,7 @@ class HexReasoningSolver:
         solver.parameters.num_search_workers = 8
         solver.parameters.core_minimization_level = 2
         status = solver.Solve(model)
+        self._check_cancelled()
         if status != cp_model.INFEASIBLE:
             return specs, False
 

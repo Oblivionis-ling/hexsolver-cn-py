@@ -1,23 +1,25 @@
 # HexInfinite 种子求解器
 
-当前版本：`0.7.4`
+当前版本：`0.8.0`
 
 这是一个面向 `Hexcells Infinite` 的 Windows 中文逐步求解器。输入种子号并选择 Easy/Hard 后，程序会在本地复刻原版地图，不再启动 `Hexcells Infinite.exe`；你可以手动同步当前进度，然后每次只获取一个必然步骤和中文理由。
 
 ## 下载 Windows 单文件版
 
-从 [GitHub Release v0.7.4](https://github.com/Oblivionis-ling/hexsolver-cn-py/releases/tag/v0.7.4) 下载：
+从 [GitHub Release v0.8.0](https://github.com/Oblivionis-ling/hexsolver-cn-py/releases/tag/v0.8.0) 下载：
 
-- `HexInfiniteSolver-0.7.4-windows-x64.exe`
-- `HexInfiniteSolver-0.7.4-windows-x64.exe.sha256`
+- `HexInfiniteSolver-0.8.0-windows-x64.exe`
+- `HexInfiniteSolver-0.8.0-windows-x64.exe.sha256`
 
-无需安装 Python、Conda 或项目依赖，下载后直接双击 EXE。`0.7.4` 将“启动窗口”改为默认折叠的白底下拉选择器：平时只显示当前模式，展开后显示三个可选项，并提供浅蓝选中态、清晰焦点和键盘操作。启动模式、求解、地图生成、缓存和推理解释核心保持不变。
+无需安装 Python、Conda 或项目依赖，下载后直接双击 EXE。`0.8.0` 将下一步推理移入后台，增加重做、局面自动恢复和 `.hexsave` 手动存档；Easy/Hard 地图生成、求解规则和推理解释核心保持不变。
 
 系统要求：Windows 10/11 x64。Hard 完全离线可用；Easy 仍需要本机合法安装 Steam 版 `Hexcells Infinite`，程序只读其 `Assembly-CSharp.dll` 并校验版本，不会把原游戏 DLL、EXE 或存档打进安装包。由于当前成品未做商业代码签名，Windows 首次下载时可能显示 SmartScreen 提示；请用 Release 同时提供的 SHA-256 文件核对完整性。
 
 ![0.7.3 启动使用说明与手绘功能箭头](docs/design/ui-v073-onboarding.png)
 
 ![0.7.4 白底启动窗口下拉选择器](docs/design/ui-v074-settings-dropdown.png)
+
+![0.8.0 局面与进度设置](docs/design/ui-v080-settings-progress-native.png)
 
 ## 已可用
 
@@ -26,7 +28,7 @@
 - Hard：纯 Python 精确移植原版 `LevelGenerator + Solver/Set`。
 - 原版最终格子、公开/隐藏状态、数字/连续/非连续提示、花格和三方向行线索导入。
 - 可缩放、平移、点击的独立棋盘。
-- 未知 / 蓝色 / 排除三态手动同步；紧凑六边形图例通过颜色、图形、悬停提示和无障碍名称表达状态，选中轮廓依次使用黑色、橘色和蓝色，支持撤销和重置。
+- 未知 / 蓝色 / 排除三态手动同步；紧凑六边形图例通过颜色、图形、悬停提示和无障碍名称表达状态，选中轮廓依次使用黑色、橘色和蓝色，支持撤销、重做和重置。
 - 设置页可选择原版式鼠标操作；开启后左键排除、右键标记蓝色，对同一状态再次按相同按键会恢复未知。该模式默认关闭，开启时手动状态按钮会暂时禁用，避免输入含义冲突。
 - 应用默认以保留标题栏和系统任务栏的最大化窗口启动；设置页可改为无边框全屏或普通窗口，并在下次启动时遵循。
 - 启动时不再显示模拟棋盘，而是以四个手绘箭头说明种子生成、手动同步、下一步推理和设置入口；可直接关闭，成功生成真实盘面后自动收起，也可从设置中重新查看。
@@ -41,9 +43,10 @@
 - 推理文档末尾具有独立安全区；无论全屏、默认窗口还是最小窗口，滚动到底后最后一行都会完整停在按钮栏上方。
 - 三个方向的所有行线索始终显示在棋盘上层，并为顶部、右侧和工具栏预留安全边距。
 - 公开盘面与私有答案隔离；答案只用于测试核对，不参与推理。
-- 生成在后台线程中运行，期间有明确加载、禁用和失败重试状态。
+- 生成和下一步推理都在后台线程中运行；盘面在推理期间发生变化时，旧结果会被自动丢弃。
+- 当前真实局面自动原子保存；启动时可选择继续，设置页可关闭询问、手动保存或载入 `.hexsave`，以及清除当前进度。存档包含版本和完整性校验。
 - Easy/Hard 精确生成结果自动保存为经过字段校验的版本化 JSON；损坏或过期缓存会被忽略并重新生成，界面会明确区分“离线精确生成”和“本地缓存”。
-- 右下角齿轮打开独立设置页；当前可选择启动窗口模式、重新查看使用说明、切换原版式左右键操作，并查看缓存条目数、占用空间和存储位置或删除全部种子结果缓存。
+- 右下角齿轮打开独立设置页；当前可管理窗口模式、局面进度、使用说明、原版式左右键操作和种子结果缓存。
 - 截图/OCR 导入入口当前暂时关闭；识图到地图的转换逻辑完成重做和精度验证后再重新开放。
 
 ## 精确性边界
@@ -65,13 +68,13 @@ Easy 托管程序集固定检查以下基线：
 D:\Desktop\HexInfinite\reverse_harness\game
 ```
 
-当前验证结果：Easy/Hard seed 1–50 的最终 TSV 均逐字段一致，并额外通过 `00000000`、`99999999` 两个边界种子；Hard 样本覆盖五种地图形状。`0.4.1` 修正棋盘上下镜像，`0.4.2` 同步修正左右斜向标签，`0.4.3` 加入详细可核查推理；`0.5.0` 至 `0.7.1` 逐步完善封装、显示、缓存、输入和推理联动；`0.7.2` 优化推理层级调度；`0.7.3` 调整启动、设置和新手引导体验；`0.7.4` 只重做启动窗口选择器的折叠、白底及交互态。`0.7.4` 未改变规则定义、地图生成或私有答案隔离。seed 1/2 已与现有官方截图逐个核对轮廓和线索方位。`reverse_harness` 中的原版运行时桥只保留为显式差分校验工具，不在默认产品链路中。
+当前验证结果：Easy/Hard seed 1–50 的最终 TSV 均逐字段一致，并额外通过 `00000000`、`99999999` 两个边界种子；Hard 样本覆盖五种地图形状。`0.4.1` 修正棋盘上下镜像，`0.4.2` 同步修正左右斜向标签，`0.4.3` 加入详细可核查推理；`0.5.0` 至 `0.7.1` 逐步完善封装、显示、缓存、输入和推理联动；`0.7.2` 优化推理层级调度；`0.7.3–0.7.4` 调整启动、设置和新手引导体验；`0.8.0` 增加后台推理、局面存取及完整撤销/重做。`0.8.0` 未改变规则定义、地图生成或私有答案隔离。seed 1/2 已与现有官方截图逐个核对轮廓和线索方位。`reverse_harness` 中的原版运行时桥只保留为显式差分校验工具，不在默认产品链路中。
 
 性能边界：Easy 通常不到 1 秒；Hard 会忠实重放原版的多轮可解性验证与冗余线索裁剪，小图约数秒，少数复杂种子可能需要几十秒。首次生成始终在 UI 后台线程中执行；成功结果会自动缓存，相同 Build、后端、难度和种子的后续加载通常只需读取本地 JSON。
 
 ## 启动
 
-普通用户优先使用 Release 中的 `HexInfiniteSolver-0.7.4-windows-x64.exe`，直接双击即可。
+普通用户优先使用 Release 中的 `HexInfiniteSolver-0.8.0-windows-x64.exe`，直接双击即可。
 
 以下方式用于源码开发：
 
@@ -107,7 +110,7 @@ conda run -n hexsolver-cn python main.py
 5. 点击“计算下一步”。
 6. 查看高亮目标、动作和中文理由；把鼠标移到理由中的坐标、坐标数组或行名称上可预览对应棋盘元素，点击可固定/取消联动。右侧勾选按钮可把建议应用到本地盘面。
 
-首次启动先按手绘说明输入种子并生成地图；生成成功后说明自动收起。原版式操作下，对同一格再次使用相同按键会恢复未知。中键拖动棋盘，滚轮缩放。右下角按钮可撤销、重置、缩放、适合窗口并打开设置。种子缓存默认位于 `%LOCALAPPDATA%\HexInfiniteSolver\seed-cache\v1`；设置页可管理启动窗口、重新打开使用说明、切换鼠标操作、查看实际缓存路径和删除缓存。截图按钮当前为禁用状态，悬停会提示“截图识别精度优化中，暂时关闭”；当前请使用种子生成地图并手动同步游戏进度。
+首次启动先按手绘说明输入种子并生成地图；生成成功后说明自动收起。原版式操作下，对同一格再次使用相同按键会恢复未知。中键拖动棋盘，滚轮缩放。右下角可撤销、重做、重置、缩放、适合窗口并打开设置；`Ctrl+Z` 撤销、`Ctrl+Y` 重做。自动存档默认位于 `%LOCALAPPDATA%\HexInfiniteSolver\sessions\autosave.hexsave`，种子缓存位于 `%LOCALAPPDATA%\HexInfiniteSolver\seed-cache\v1`。截图按钮当前为禁用状态；当前请使用种子生成地图并手动同步游戏进度。
 
 `0.4.3` 的理由不再只显示一句结论：
 
@@ -151,7 +154,7 @@ conda run -n hexsolver-cn python main.py
 .\test.ps1
 ```
 
-构建并验证 0.7.4 单文件成品：
+构建并验证 0.8.0 单文件成品：
 
 ```powershell
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\build_app.ps1
@@ -159,7 +162,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 
 构建脚本会执行源码测试、构建 Easy 托管核心、生成单文件 EXE、检查归档不含原游戏程序集，并启动真实成品完成 UI + Easy/Hard seed 1 冒烟测试。详细边界见 [Windows 打包与发布](docs/PACKAGING.md)。
 
-当前 74 项自动测试覆盖 TSV 合约、两套交错坐标相位、官方 Y 轴方向、Easy/Hard 样本、Unity RNG 位模式、默认后端不启动游戏、揭示/撤销、完整逐步回放、五类详细推理理由、严格推理层级短路与全局唯一性门禁、空启动盘面、四步使用说明、三种启动窗口模式与设置持久化、白底折叠下拉菜单、应用建议无提示框、单坐标/长数组/三方向行引用解析、Qt 分层联动、减少动态模式、三种手动标记轮廓、长文本显示、后台生成和 Qt 主流程。Easy/Hard seed 1–50 及两个八位边界种子已做原版逐字段差分；代表种子还会完整解到零未知格并逐步核对私有答案。
+当前 84 项自动测试覆盖原有生成、求解和 UI 回归，并新增撤销/重做、存档原子写入、完整性与版本门禁、自动恢复接受/放弃、后台推理和过期结果保护。Easy/Hard seed 1–50 及两个八位边界种子已做原版逐字段差分；代表种子还会完整解到零未知格并逐步核对私有答案。
 
 仓库自带 `tests/fixtures/` 的 Easy/Hard seed 1 结构化夹具。没有原版程序集时，Easy 托管核心的真实集成项会明确跳过，其余单元测试和 Hard 离线测试仍可运行。
 
@@ -189,7 +192,7 @@ HexReasoningSolver.next_step()
 
 主要文件：
 
-- `src/hexsolver_cn/app.py`：双栏桌面界面、后台生成与交互编排。
+- `src/hexsolver_cn/app.py`：双栏桌面界面、后台生成/推理与交互编排。
 - `src/hexsolver_cn/seed_cache.py`：种子结果缓存键、JSON 校验、原子写入、统计和清理。
 - `src/hexsolver_cn/settings_dialog.py`：可扩展设置页和缓存管理界面。
 - `src/hexsolver_cn/preferences.py`：用户体验选项的类型化持久化存储。
@@ -199,16 +202,17 @@ HexReasoningSolver.next_step()
 - `src/hexsolver_cn/board_view.py`：六边形 Qt 画布与行线索。
 - `src/hexsolver_cn/reason_interaction.py`：推理引用解析、富文本悬停/固定状态和键盘交互。
 - `src/hexsolver_cn/solver.py`：确定性局部规则与 CP-SAT 兜底。
-- `src/hexsolver_cn/session.py`：当前局面、剩余数、历史和撤销。
+- `src/hexsolver_cn/session.py`：当前局面、剩余数、撤销与重做。
+- `src/hexsolver_cn/session_store.py`：版本化局面存档、完整性校验、原子写入和恢复。
 - `src/hexsolver_cn/unity_random.py`：Unity 5.6.3f1 RNG 位兼容实现。
 - `src/hexsolver_cn/hard_generator.py`：Hard 初始形状、颜色与 Unity 随机序列。
 - `managed_core/`：C# 最小 Unity API 兼容层、Easy 宿主和一键构建脚本。
 - `tools/doctor.py`：离线后端诊断；原版启动差分必须显式启用。
-- `packaging/`：0.7.4 Windows 单文件构建、图标/版本资源和成品冒烟测试入口。
+- `packaging/`：0.8.0 Windows 单文件构建、图标/版本资源和成品冒烟测试入口。
 
 ## 文档
 
-- [开发历史](DEVELOPMENT_HISTORY.md)：从 `0.1.0` 截图原型到当前 `0.7.4` 版本。
+- [开发历史](DEVELOPMENT_HISTORY.md)：从 `0.1.0` 截图原型到当前 `0.8.0` 版本。
 - [工作区说明](docs/WORKSPACE.md)：本地目录、专有文件边界、清理与恢复规则。
 - [求解算法](docs/solver/ALGORITHM.md)：局部规则、CP-SAT 和全局反证。
 - [Windows 打包与发布](docs/PACKAGING.md)：单文件内容、构建、验证和专有文件边界。

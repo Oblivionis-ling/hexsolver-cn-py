@@ -78,6 +78,30 @@ class InteractiveSessionTests(unittest.TestCase):
         session.undo()
         self.assertIs(CellVisualType.HIDDEN, session.board.get_cell((1, 0)).visual_type)
 
+    def test_undo_redo_round_trip_and_new_edit_clears_redo(self) -> None:
+        session = InteractivePuzzleSession(build_count_one_board())
+        session.set_cell_state((1, 0), CellVisualType.BLUE)
+
+        undone = session.undo()
+        self.assertIsNotNone(undone)
+        self.assertEqual(1, len(session.redo_history))
+        redone = session.redo()
+        self.assertEqual(undone, redone)
+        self.assertIs(CellVisualType.BLUE, session.board.get_cell((1, 0)).visual_type)
+
+        session.undo()
+        session.set_cell_state((1, 0), CellVisualType.BLACK)
+        self.assertEqual([], session.redo_history)
+        self.assertIsNone(session.redo())
+
+    def test_reset_clears_undo_and_redo_history(self) -> None:
+        session = InteractivePuzzleSession(build_count_one_board())
+        session.set_cell_state((1, 0), CellVisualType.BLACK)
+        session.undo()
+        session.reset()
+        self.assertEqual([], session.history)
+        self.assertEqual([], session.redo_history)
+
     def test_clue_cell_is_not_editable(self) -> None:
         session = InteractivePuzzleSession(build_count_one_board())
         with self.assertRaises(BoardStateError):

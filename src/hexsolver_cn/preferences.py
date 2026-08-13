@@ -7,6 +7,7 @@ from PySide6.QtCore import QSettings
 
 ORIGINAL_MOUSE_CONTROLS_KEY = "controls/original_mouse_buttons"
 STARTUP_WINDOW_MODE_KEY = "ui/startup_window_mode"
+RESTORE_LAST_SESSION_KEY = "session/restore_last_session"
 
 
 class StartupWindowMode(str, Enum):
@@ -57,6 +58,16 @@ class AppPreferences:
 
     def set_startup_window_mode(self, mode: StartupWindowMode) -> None:
         self._set_value(STARTUP_WINDOW_MODE_KEY, mode.value)
+
+    @property
+    def restore_last_session_enabled(self) -> bool:
+        value = self._value(RESTORE_LAST_SESSION_KEY, True)
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+    def set_restore_last_session_enabled(self, enabled: bool) -> None:
+        self._set_value(RESTORE_LAST_SESSION_KEY, bool(enabled))
 
     def _value(self, key: str, default: object) -> object:
         if self._settings is None:

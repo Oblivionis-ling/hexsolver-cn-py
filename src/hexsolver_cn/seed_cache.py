@@ -217,7 +217,7 @@ def _puzzle_to_payload(puzzle: GeneratedPuzzle) -> dict[str, Any]:
         },
         "backend_id": puzzle.backend_id,
         "fidelity": puzzle.fidelity.value,
-        "public_board": _board_to_payload(puzzle.public_board),
+        "public_board": board_to_payload(puzzle.public_board),
         "private_answer": [
             {"coord": list(coord), "visual_type": visual_type.value}
             for coord, visual_type in sorted(puzzle.private_answer.items())
@@ -278,7 +278,7 @@ def _puzzle_from_payload(value: Any) -> GeneratedPuzzle:
 
     return GeneratedPuzzle(
         request=request,
-        public_board=_board_from_payload(payload.get("public_board")),
+        public_board=board_from_payload(payload.get("public_board")),
         private_answer=private_answer,
         private_reveals=private_reveals,
         backend_id=_string(payload.get("backend_id"), "backend_id"),
@@ -287,7 +287,7 @@ def _puzzle_from_payload(value: Any) -> GeneratedPuzzle:
     )
 
 
-def _board_to_payload(board: Board) -> dict[str, Any]:
+def board_to_payload(board: Board) -> dict[str, Any]:
     return {
         "image_path": board.image_path,
         "image_size": list(board.image_size),
@@ -347,7 +347,7 @@ def _row_clue_to_payload(row: RowClue) -> dict[str, Any]:
     }
 
 
-def _board_from_payload(value: Any) -> Board:
+def board_from_payload(value: Any) -> Board:
     payload = _mapping(value, "public_board")
     cells: dict[Coord, Cell] = {}
     for index, item in enumerate(_list(payload.get("cells"), "public_board.cells")):
