@@ -12,13 +12,15 @@
 - [`ui-v073-onboarding.png`](ui-v073-onboarding.png)：0.7.3 在 `1440 × 1024` Windows Qt 窗口中的空盘启动状态，四组手绘箭头分别指向种子生成、手动同步、下一步推理和设置入口。
 - [`ui-v074-settings-dropdown.png`](ui-v074-settings-dropdown.png)：0.7.4 设置页的启动窗口下拉菜单已展开，显示白底、深色文字、浅蓝当前项和三个完整选项。
 - [`ui-v080-settings-progress-native.png`](ui-v080-settings-progress-native.png)：0.8.0 设置页局面与进度卡，显示自动恢复状态、手动保存/载入和清除进度入口。
+- [`ui-light-confirmation.png`](ui-light-confirmation.png)：0.8.1 自绘浅色恢复确认框，显示白底高对比度表面和“继续局面 / 放弃并查看说明”中文按钮。
+- [`ui-readable-global-reason.png`](ui-readable-global-reason.png)：0.8.1 Hard seed 3 的首个全局唯一性步骤，首屏先显示结论、试填反证与关键条件概览。
 - Onboarding implementation pixels: `1440 × 1024` at device pixel ratio `1.0`.
 - 0.7.4 settings evidence pixels: `1440 × 1200`; logical dialog viewport: `720 × 600` at device pixel ratio `2.0`.
-- 仓库保留 0.7.3 启动说明、0.7.4 白底下拉菜单和 0.8.0 局面进度卡作为当前应用界面证据；0.7.1 的分层联动高亮继续由自动回归、成品冒烟和下方历史记录验证。
+- 仓库保留 0.7.3 启动说明、0.7.4 白底下拉菜单、0.8.0 局面进度卡以及 0.8.1 的确认框和全局理由作为当前应用界面证据；0.7.1 的分层联动高亮继续由自动回归、成品冒烟和下方历史记录验证。
 
 **Normalized comparison**
 
-- 旧的并排比较图已经在 `0.6.4` 仓库整理时移除；仓库保留两张生成结果证据和两张当前应用界面截图。
+- 旧的并排比较图已经在 `0.6.4` 仓库整理时移除；仓库保留两张生成结果证据和必要的当前应用界面证据。
 - 早期方案对照曾把 source 与 implementation 归一化到 `1440 × 1024`；该并排图已按仓库整理规则移除，比较结论保留在下方历史中。
 - 当前视觉证据由真实 Windows Qt 平台生成：启动说明继续使用 `1440 × 1024` 画面，下拉菜单使用 `720 × 600` 逻辑设置窗口并保留当前 Windows 的 `2.0` 设备像素比，不伪造缩放环境。
 
@@ -149,6 +151,14 @@ The current Hard runtime capture now shows the same intended content class as th
 - 无活动局面时保存与清除按钮具有明确灰色禁用态，载入入口保持可用；滚动结构和固定“完成”按钮不变。
 - 原生 Windows Qt 截图确认文字对比度、按钮层级、卡片间距和 1440 × 1024 首屏滚动位置正常。
 
+### Pass 15 (`0.8.1`)
+
+- 将系统消息框替换为完全自绘的浅色确认框，因此 Windows 深色应用主题不会再把确认操作渲染成突兀的深灰表面；白底、深色文字、橙色品牌图形和浅蓝信息图标与主界面一致。
+- 恢复确认使用“继续局面 / 放弃并查看说明”直接描述结果；清除进度和删除缓存复用相同组件，并保留危险操作的明确措辞和安全默认项。
+- 全局唯一性正文在首屏先显示目标格结论和三步试填反证，把完整条件、坐标与候选格移入仍可滚动查看的详细核查区；解释数据没有删减。
+- 正文调整为 14 px、145% 行高和更深文字，分区标题加粗并增加留白；Hard seed 3 的原生 Windows Qt 截图确认结论与反证摘要无需先阅读长坐标列表即可理解。
+- 85 项源码回归检查弹窗表面与按钮、恢复分支、新全局说明结构、“合法填法 = 0”、详细核查保留以及原推理引用联动。
+
 ## Implementation checklist
 
 - [x] Selected direction 2 reproduced as a functional two-column desktop UI.
@@ -159,7 +169,7 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Easy seed 1 dense-board capture passed visual inspection.
 - [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
 - [x] 0.7.3 onboarding and 0.7.4 white startup dropdown passed native Windows Qt visual inspection at their recorded logical sizes and device pixel ratios.
-- [x] Eighty-four automated core, cache, bridge, solver, session-store and Qt workflow tests pass.
+- [x] Eighty-five automated core, cache, bridge, solver, session-store and Qt workflow tests pass.
 - [x] Full-screen long-reason bottom capture and end-cursor visibility check pass.
 - [x] Hidden, blue and excluded buttons render black, orange and blue active outlines respectively.
 - [x] Original-style mouse controls persist, map real left/right clicks, toggle back to unknown, and restore manual tools when disabled.
@@ -167,6 +177,8 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Startup is empty and maximized by default; all three window modes persist, the guide can close/reopen, and a verified seed board automatically dismisses it.
 - [x] The apply-suggestion button has no tooltip and retains an accessible name and description.
 - [x] Progress settings, save/load/clear actions and the restore-state badge remain legible on native Windows Qt.
+- [x] Confirmation dialogs remain light under the native Windows theme and use explicit Chinese outcomes.
+- [x] Global uniqueness reasons show the conclusion and trial-elimination summary before optional detailed coordinates.
 - [x] No actionable P0/P1/P2 visual findings remain.
 
 final result: passed

@@ -6,7 +6,15 @@ from enum import Enum
 from typing import Optional
 
 from PySide6.QtCore import QEvent, QPoint, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QKeyEvent, QMouseEvent, QTextCharFormat, QTextCursor
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QKeyEvent,
+    QMouseEvent,
+    QTextBlockFormat,
+    QTextCharFormat,
+    QTextCursor,
+)
 from PySide6.QtWidgets import QTextBrowser
 
 from .models import Board, CellVisualType, Coord, LineFamily
@@ -190,8 +198,45 @@ class InteractiveReasonBrowser(QTextBrowser):
             self._href(reference): reference for reference in self._references
         }
         self.setPlainText(text)
+        self._apply_readable_layout()
         self._refresh_reference_formats()
         self.reference_focus_changed.emit(None, False)
+
+    def _apply_readable_layout(self) -> None:
+        """Give plain-text proofs hierarchy without changing reference offsets."""
+
+        section_headings = {
+            "结论先看",
+            "为什么这样判断",
+            "关键条件概览",
+            "详细核查（第一次阅读可以先跳过）",
+            "术语说明",
+            "推理过程：",
+        }
+        block = self.document().begin()
+        while block.isValid():
+            block_cursor = QTextCursor(block)
+            block_format = QTextBlockFormat(block.blockFormat())
+            block_format.setLineHeight(
+                145.0,
+                QTextBlockFormat.LineHeightTypes.ProportionalHeight.value,
+            )
+            block_format.setBottomMargin(3)
+            is_heading = block.text().strip() in section_headings
+            if is_heading:
+                block_format.setTopMargin(9)
+                block_format.setBottomMargin(4)
+            block_cursor.setBlockFormat(block_format)
+            if is_heading:
+                block_cursor.movePosition(
+                    QTextCursor.MoveOperation.EndOfBlock,
+                    QTextCursor.MoveMode.KeepAnchor,
+                )
+                heading_format = QTextCharFormat()
+                heading_format.setForeground(QColor(COLORS["text"]))
+                heading_format.setFontWeight(QFont.Weight.Bold)
+                block_cursor.mergeCharFormat(heading_format)
+            block = block.next()
 
     def clear_reference_state(self) -> None:
         if self._hovered is None and self._pinned is None:

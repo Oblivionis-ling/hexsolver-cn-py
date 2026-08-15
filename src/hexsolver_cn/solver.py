@@ -619,45 +619,79 @@ class HexReasoningSolver:
     def _global_reason(self, board: Board, coord: Coord, action: MoveAction) -> str:
         correct_value = action is MoveAction.MARK_BLUE
         wrong_value = not correct_value
-        correct_color = "蓝" if correct_value else "黑"
-        wrong_color = "蓝" if wrong_value else "黑"
+        correct_color = "蓝色" if correct_value else "黑色"
+        wrong_color = "蓝色" if wrong_value else "黑色"
+        correct_action = "标记蓝色" if correct_value else "标记排除"
         core_specs, extracted = self._conflict_core(board, coord, wrong_value)
-        condition_lines = [
-            f"   {index}. {self._constraint_state_text(board, spec)}"
+        condition_summaries = [
+            f"• 条件 {index}：{self._constraint_summary_text(board, spec)}"
             for index, spec in enumerate(core_specs, start=1)
         ]
-        core_description = (
-            "求解器从全部约束中提取出以下一组足以造成矛盾的关键条件"
+        condition_details = [
+            f"条件 {index}\n{self._constraint_state_text(board, spec)}"
+            for index, spec in enumerate(core_specs, start=1)
+        ]
+        detail_intro = (
+            "下面是求解器从全部线索中提取的一组、已经足够否定错误假设的条件。"
             if extracted
-            else "求解器使用以下完整条件集合复核矛盾"
+            else "下面使用当前盘面的完整条件集合复核错误假设。"
         )
         return "\n".join(
             (
-                "全局唯一性推理（反证）：",
-                f"1. 目标：判断 {board.describe_cell(coord)} 的颜色；局部计数、排列和子集规则目前都不能直接确定它。",
-                f"2. 错误假设：先假设该格为{wrong_color}。",
-                f"3. 关键条件：{core_description}：",
-                *condition_lines,
-                f"4. 冲突检查：把“目标格为{wrong_color}”与上述条件同时成立作为要求时，约束模型无可行解；"
-                "也就是不存在一种蓝黑分配能同时满足它们。",
-                f"5. 反向验证：改为假设目标格为{correct_color}时，完整的当前约束系统至少存在一个可行解。",
-                f"6. 结论：{wrong_color}的假设被排除，因此 {board.describe_cell(coord)} 必须判{correct_color}。",
-                "说明：这里列出的是一组足以证明无解的冲突条件，不宣称它是唯一或数学上最小的证明。",
+                "结论先看",
+                f"{board.describe_cell(coord)} 必须{correct_action}。",
+                "",
+                "为什么这样判断",
+                "这一步不是某一条线索单独推出的，可以把它理解成“试填排除”：",
+                f"1. 先假设 {board.describe_cell(coord)} 是{wrong_color}。",
+                f"2. 同时检查下面 {len(core_specs)} 条关键条件，合法填法 = 0；"
+                "也就是无论其余未知格怎样安排，至少会有一条线索不成立。",
+                f"3. 改为{correct_color}后，完整的当前约束系统至少有 1 种合法填法。",
+                f"4. 所以{wrong_color}假设被排除，目标格只能是{correct_color}。",
+                "",
+                "关键条件概览",
+                *condition_summaries,
+                "",
+                "详细核查（第一次阅读可以先跳过）",
+                detail_intro,
+                *condition_details,
+                "",
+                "术语说明",
+                "“合法填法 = 0”表示这些条件无法同时满足，并不是程序在多个答案中随便选择。"
+                "这里列出的是一组足够证明矛盾的条件，不宣称它是唯一或数学上最小的证明。",
             )
+        )
+
+    def _constraint_summary_text(self, board: Board, spec: ConstraintSpec) -> str:
+        hidden, known_blue_coords = self._hidden_and_known_blue_coords(board, spec.coords)
+        if spec.is_global_remaining:
+            return f"{spec.label}：{len(hidden)} 个候选格中还要放 {spec.number} 个蓝格。"
+        need = spec.number - len(known_blue_coords)
+        pattern_note = ""
+        if spec.clue_type is ClueType.CONSECUTIVE:
+            pattern_note = "，并满足连续规则"
+        elif spec.clue_type is ClueType.NONCONSECUTIVE:
+            pattern_note = "，并满足不连续规则"
+        return (
+            f"{spec.label}：已经确定 {len(known_blue_coords)} / {spec.number} 个蓝格，"
+            f"还缺 {need} 个；候选 {len(hidden)} 格{pattern_note}。"
         )
 
     def _constraint_state_text(self, board: Board, spec: ConstraintSpec) -> str:
         hidden, known_blue_coords = self._hidden_and_known_blue_coords(board, spec.coords)
         if spec.is_global_remaining:
             return (
-                f"{spec.label}：全盘 {len(hidden)} 个未知格中必须恰有 {spec.number} 个蓝格；"
-                f"未知格为 {self._format_coords(hidden)}。"
+                f"  {spec.label}\n"
+                f"  需求：全盘剩余的 {len(hidden)} 个未知格中，必须放入 {spec.number} 个蓝格。\n"
+                f"  候选：{self._format_coords(hidden)}"
             )
         need = spec.number - len(known_blue_coords)
         return (
-            f"{spec.label}：{self._clue_requirement(spec)}；当前已知蓝格 {len(known_blue_coords)} 个 "
-            f"{self._format_coords(known_blue_coords)}，未知格 {len(hidden)} 个 {self._format_coords(hidden)}；"
-            f"还需蓝格 = {spec.number} - {len(known_blue_coords)} = {need}。"
+            f"  {spec.label}\n"
+            f"  需求：{self._clue_requirement(spec)}。\n"
+            f"  当前：已确定蓝格 {len(known_blue_coords)} 个 {self._format_coords(known_blue_coords)}；"
+            f"还缺 {spec.number} - {len(known_blue_coords)} = {need} 个。\n"
+            f"  候选：{len(hidden)} 格 {self._format_coords(hidden)}"
         )
 
     @staticmethod

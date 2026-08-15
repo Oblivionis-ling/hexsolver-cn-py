@@ -13,7 +13,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QEvent, QPointF, QSettings, Qt  # noqa: E402
 from PySide6.QtGui import QColor, QFont, QPalette, QTextCursor  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
-from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
+from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from hexsolver_cn.app import (  # noqa: E402
     MainWindow,
@@ -22,6 +22,7 @@ from hexsolver_cn.app import (  # noqa: E402
 )
 from hexsolver_cn.board_view import HexBoardView  # noqa: E402
 from hexsolver_cn.demo_board import build_demo_board  # noqa: E402
+from hexsolver_cn.dialogs import LightConfirmDialog  # noqa: E402
 from hexsolver_cn.models import CellVisualType, MoveAction, SuggestedMove  # noqa: E402
 from hexsolver_cn.original_bridge import (  # noqa: E402
     OriginalRuntimeHardBackend,
@@ -182,8 +183,8 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.window._save_autosave_now()
 
         with patch(
-            "hexsolver_cn.app.QMessageBox.question",
-            return_value=QMessageBox.StandardButton.Yes,
+            "hexsolver_cn.app.ask_confirmation",
+            return_value=True,
         ):
             restored = MainWindow(
                 seed_generators=SeedGeneratorRegistry(),
@@ -205,8 +206,8 @@ class QtAppWorkflowTests(unittest.TestCase):
     def test_autosave_decline_discards_progress_and_keeps_guide(self) -> None:
         self.window._save_autosave_now()
         with patch(
-            "hexsolver_cn.app.QMessageBox.question",
-            return_value=QMessageBox.StandardButton.No,
+            "hexsolver_cn.app.ask_confirmation",
+            return_value=False,
         ):
             fresh = MainWindow(
                 seed_generators=SeedGeneratorRegistry(),
@@ -586,8 +587,8 @@ class QtAppWorkflowTests(unittest.TestCase):
             self.assertEqual("重新查看使用说明", dialog.show_guide_button.accessibleName())
 
             with patch(
-                "hexsolver_cn.settings_dialog.QMessageBox.question",
-                return_value=QMessageBox.StandardButton.Yes,
+                "hexsolver_cn.settings_dialog.ask_confirmation",
+                return_value=True,
             ):
                 dialog.confirm_clear_cache()
 
@@ -595,6 +596,28 @@ class QtAppWorkflowTests(unittest.TestCase):
             self.assertFalse(cache_file.exists())
             self.assertFalse(dialog.clear_cache_button.isEnabled())
             self.assertIn("已删除", dialog.feedback_label.text())
+            dialog.close()
+
+    def test_confirmation_dialog_forces_light_surface_and_clear_actions(self) -> None:
+        dialog = LightConfirmDialog(
+            self.window,
+            title="发现未完成的局面",
+            message="检测到上一次自动保存的局面，要从这里继续吗？",
+            detail="继续会恢复盘面；放弃会删除自动保存。",
+            accept_text="继续局面",
+            reject_text="放弃并查看说明",
+        )
+        try:
+            dialog.show()
+            self.app.processEvents()
+            self.assertIn("background-color: #FFFFFF", dialog.styleSheet())
+            self.assertEqual("发现未完成的局面", dialog.title_label.text())
+            self.assertEqual("继续局面", dialog.accept_button.text())
+            self.assertEqual("放弃并查看说明", dialog.reject_button.text())
+            self.assertTrue(dialog.accept_button.isDefault())
+            self.assertGreaterEqual(dialog.accept_button.height(), 42)
+            self.assertEqual("关闭", dialog.close_button.accessibleName())
+        finally:
             dialog.close()
 
     def test_startup_mode_and_guide_request_are_persisted_and_exposed(self) -> None:

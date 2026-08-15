@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
-    QMessageBox,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
@@ -26,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from .board_view import HexBoardView
+from .dialogs import ask_confirmation
 from .models import Board, CellVisualType, Coord, MoveAction, SuggestedMove
 from .onboarding import GuideTarget, OnboardingOverlay
 from .original_bridge import build_default_seed_registry
@@ -502,11 +502,11 @@ class MainWindow(QMainWindow):
         self.step_reason.setViewportMargins(0, 0, 0, 0)
         self.step_reason.document().setDocumentMargin(2)
         self.step_reason.setStyleSheet(
-            f"QTextBrowser {{ font-size: 13px; color: {COLORS['muted']}; background: {COLORS['panel']}; "
+            f"QTextBrowser {{ font-size: 14px; color: {COLORS['text']}; background: {COLORS['panel']}; "
             "border: none; padding: 0 2px 0 0; }}"
         )
         reason_font = QFont("Microsoft YaHei UI")
-        reason_font.setPixelSize(13)
+        reason_font.setPixelSize(14)
         self.step_reason.setFont(reason_font)
         self.step_reason.document().setDefaultFont(reason_font)
         self.step_reason.reference_focus_changed.connect(self._on_reason_reference_focus)
@@ -995,14 +995,17 @@ class MainWindow(QMainWindow):
         self._save_autosave_now()
 
     def clear_current_progress(self) -> None:
-        answer = QMessageBox.question(
+        confirmed = ask_confirmation(
             self,
-            "清除当前进度",
-            "确定清除当前局面和最近一次自动保存吗？\n\n手动另存的局面文件不会被删除。",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
+            title="清除当前进度",
+            message="确定清除当前局面和最近一次自动保存吗？",
+            detail="手动另存的 .hexsave 局面文件不会被删除。",
+            accept_text="清除进度",
+            reject_text="取消",
+            destructive=True,
+            default_accept=False,
         )
-        if answer != QMessageBox.StandardButton.Yes:
+        if not confirmed:
             return
         try:
             self.session_store.clear_autosave()
@@ -1028,14 +1031,19 @@ class MainWindow(QMainWindow):
             or not self.session_store.has_autosave()
         ):
             return
-        answer = QMessageBox.question(
+        confirmed = ask_confirmation(
             self,
-            "继续上一次局面",
-            "检测到上一次保存的局面，是否继续？\n\n选择“否”会放弃该自动保存并显示使用说明。",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes,
+            title="发现未完成的局面",
+            message="检测到上一次自动保存的局面，要从这里继续吗？",
+            detail=(
+                "继续后会恢复盘面、撤销/重做记录和当前推理位置。\n"
+                "放弃则删除这份自动保存，并显示使用说明。"
+            ),
+            accept_text="继续局面",
+            reject_text="放弃并查看说明",
+            default_accept=True,
         )
-        if answer != QMessageBox.StandardButton.Yes:
+        if not confirmed:
             try:
                 self.session_store.clear_autosave()
             except SessionStoreError:

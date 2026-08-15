@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QPushButton,
     QScrollArea,
     QStyle,
@@ -25,6 +24,7 @@ from .preferences import AppPreferences, StartupWindowMode
 from .seed_cache import SeedCacheStats, SeedResultCache
 from .session_store import SessionStore
 from .theme import COLORS
+from .dialogs import ask_confirmation
 from .widgets import ChamferPanel
 
 
@@ -679,15 +679,17 @@ class SettingsDialog(QDialog):
             self.feedback_label.setText("当前没有可删除的缓存。")
             self.refresh_cache_stats()
             return
-        answer = QMessageBox.question(
+        confirmed = ask_confirmation(
             self,
-            "删除种子结果缓存",
-            f"确定删除 {before.entry_count} 项种子结果缓存吗？\n\n"
-            "之后再次打开这些种子时，需要重新生成地图。",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
+            title="删除种子结果缓存",
+            message=f"确定删除 {before.entry_count} 项种子结果缓存吗？",
+            detail="之后再次打开这些种子时，需要重新生成地图。",
+            accept_text="删除缓存",
+            reject_text="取消",
+            destructive=True,
+            default_accept=False,
         )
-        if answer != QMessageBox.StandardButton.Yes:
+        if not confirmed:
             return
         self.cache.clear()
         after = self.refresh_cache_stats()

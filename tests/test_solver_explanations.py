@@ -274,13 +274,16 @@ class SolverExplanationTests(unittest.TestCase):
         self.assertEqual(x, move.coord)
         self.assertIs(move.action, MoveAction.MARK_BLUE)
         self.assertEqual("全局求解", move.source)
-        self.assertIn("全局唯一性推理（反证）", move.reason)
-        self.assertIn("错误假设：先假设该格为黑", move.reason)
-        self.assertIn("关键条件", move.reason)
+        self.assertTrue(move.reason.startswith("结论先看"))
+        self.assertIn("可以把它理解成“试填排除”", move.reason)
+        self.assertIn("先假设 格子 (0, 0) 是黑色", move.reason)
+        self.assertIn("合法填法 = 0", move.reason)
+        self.assertIn("关键条件概览", move.reason)
         self.assertIn("A / 横向 / 长度 2", move.reason)
         self.assertIn("B / 横向 / 长度 2", move.reason)
         self.assertIn("C / 横向 / 长度 3", move.reason)
-        self.assertIn("完整的当前约束系统至少存在一个可行解", move.reason)
+        self.assertIn("完整的当前约束系统至少有 1 种合法填法", move.reason)
+        self.assertIn("详细核查（第一次阅读可以先跳过）", move.reason)
         self.assertIn("不宣称它是唯一或数学上最小的证明", move.reason)
 
     def test_global_uniqueness_runs_only_after_every_local_tier_is_empty(self) -> None:
@@ -347,8 +350,9 @@ class SolverExplanationTests(unittest.TestCase):
         assert move is not None
         self.assertEqual(x, move.coord)
         self.assertIs(move.action, MoveAction.MARK_BLACK)
-        self.assertIn("错误假设：先假设该格为蓝", move.reason)
-        self.assertIn("因此 格子 (0, 0) 必须判黑", move.reason)
+        self.assertIn("先假设 格子 (0, 0) 是蓝色", move.reason)
+        self.assertIn("格子 (0, 0) 必须标记排除", move.reason)
+        self.assertIn("目标格只能是黑色", move.reason)
 
 
 if __name__ == "__main__":
