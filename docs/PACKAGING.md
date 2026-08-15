@@ -2,16 +2,16 @@
 
 ## 目标
 
-`0.8.1` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享版本化种子缓存与局面存档实现。本版在 0.8.0 的后台推理和局面连续性基础上加入统一浅色确认框，并把全局唯一性理由改为渐进披露结构；求解规则、地图生成、分层门禁和推理结论保持不变。
+`0.8.2` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享版本化种子缓存与局面存档实现。本版保留 0.8.1 的浅色确认框和渐进式全局说明，通过合法解见证、同局面模型复用和短时最大差异合法解减少 CP-SAT 重复工作；地图生成、规则、步骤顺序、解释和推理结论保持不变。
 
 发布资产：
 
 ```text
-HexInfiniteSolver-0.8.1-windows-x64.exe
-HexInfiniteSolver-0.8.1-windows-x64.exe.sha256
+HexInfiniteSolver-0.8.2-windows-x64.exe
+HexInfiniteSolver-0.8.2-windows-x64.exe.sha256
 ```
 
-最终冻结成品为 96,548,495 字节（92.08 MiB），FileVersion/ProductVersion 均为 `0.8.1`，SHA-256 为 `14ee150f18687ee501232ca240fc25fea6a0a13f07c30a7760c6b6bd39bad1a1`。
+最终冻结成品为 96,551,060 字节（92.08 MiB），FileVersion/ProductVersion 均为 `0.8.2`，SHA-256 为 `a98834dd256bf87d121ebb7059df9fcffa414c2e0a49cc18448289d71151fdd6`。
 
 ## 成品包含什么
 
@@ -22,7 +22,7 @@ HexInfiniteSolver-0.8.1-windows-x64.exe.sha256
 - Qt 插件、字体图标、应用图标和 Windows 版本资源。
 - 种子缓存、局面存档、用户体验偏好与设置页；运行时用户数据不会预置在 EXE 中。
 
-截图入口当前关闭，因此 0.8.1 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
+截图入口当前关闭，因此 0.8.2 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
 
 ## 成品不包含什么
 

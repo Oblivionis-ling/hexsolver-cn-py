@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 
+from ortools.sat.python import cp_model
+
 from hexsolver_cn.models import (
     Board,
     Cell,
@@ -285,6 +287,120 @@ class SolverExplanationTests(unittest.TestCase):
         self.assertIn("完整的当前约束系统至少有 1 种合法填法", move.reason)
         self.assertIn("详细核查（第一次阅读可以先跳过）", move.reason)
         self.assertIn("不宣称它是唯一或数学上最小的证明", move.reason)
+
+    def test_global_search_reuses_one_model_and_checks_only_opposite_value(self) -> None:
+        class InstrumentedSolver(HexReasoningSolver):
+            def __init__(self) -> None:
+                super().__init__()
+                self.model_builds = 0
+                self.feasibility_solves = 0
+
+            def _prepare_global_model(self, board):  # type: ignore[no-untyped-def]
+                self.model_builds += 1
+                return super()._prepare_global_model(board)
+
+            def _solve_prepared_model(self, solver, prepared):  # type: ignore[no-untyped-def]
+                self.feasibility_solves += 1
+                return super()._solve_prepared_model(solver, prepared)
+
+        x, y, z, w = (0, 0), (1, 0), (0, 1), (1, 1)
+        board = make_board(
+            {coord: CellVisualType.HIDDEN for coord in (x, y, z, w)},
+            [
+                ("A", [x, y], ClueType.COUNT, 1),
+                ("B", [y, z], ClueType.COUNT, 1),
+                ("C", [x, z, w], ClueType.COUNT, 2),
+            ],
+        )
+        solver = InstrumentedSolver()
+
+        move = solver.next_step(board)
+
+        self.assertIsNotNone(move)
+        assert move is not None
+        self.assertEqual(x, move.coord)
+        self.assertIs(move.action, MoveAction.MARK_BLUE)
+        self.assertEqual(1, solver.model_builds)
+        self.assertEqual(
+            3,
+            solver.feasibility_solves,
+            "基础可行解、短时差异解和目标格相反值检查已经足以证明第一步",
+        )
+
+    def test_global_batch_uses_one_witness_and_one_probe_per_hidden_cell(self) -> None:
+        class InstrumentedSolver(HexReasoningSolver):
+            def __init__(self) -> None:
+                super().__init__()
+                self.model_builds = 0
+                self.feasibility_solves = 0
+
+            def _prepare_global_model(self, board):  # type: ignore[no-untyped-def]
+                self.model_builds += 1
+                return super()._prepare_global_model(board)
+
+            def _solve_prepared_model(self, solver, prepared):  # type: ignore[no-untyped-def]
+                self.feasibility_solves += 1
+                return super()._solve_prepared_model(solver, prepared)
+
+        coords = ((0, 0), (1, 0), (0, 1), (1, 1))
+        x, y, z, w = coords
+        board = make_board(
+            {coord: CellVisualType.HIDDEN for coord in coords},
+            [
+                ("A", [x, y], ClueType.COUNT, 1),
+                ("B", [y, z], ClueType.COUNT, 1),
+                ("C", [x, z, w], ClueType.COUNT, 2),
+            ],
+        )
+        solver = InstrumentedSolver()
+
+        moves = solver.solve(board)
+
+        self.assertEqual(set(coords), {move.coord for move in moves})
+        self.assertEqual(1, solver.model_builds)
+        self.assertEqual(2 + len(coords), solver.feasibility_solves)
+
+    def test_diverse_witness_safely_identifies_cells_with_both_values(self) -> None:
+        x, y = (0, 0), (1, 0)
+        board = make_board(
+            {x: CellVisualType.HIDDEN, y: CellVisualType.HIDDEN},
+            [("A", [x, y], ClueType.COUNT, 1)],
+        )
+        solver = HexReasoningSolver()
+        prepared = solver._prepare_global_model(board)
+        cp_solver = solver._new_feasibility_solver()
+        status = solver._solve_prepared_model(cp_solver, prepared)
+        self.assertIn(status, (cp_model.OPTIMAL, cp_model.FEASIBLE))
+        witness = {
+            coord: bool(cp_solver.Value(variable))
+            for coord, variable in prepared.variables.items()
+        }
+
+        flexible = solver._find_witness_variations(prepared, witness)
+
+        self.assertEqual({x, y}, flexible)
+        self.assertFalse(prepared.model.has_objective())
+
+    def test_diverse_witness_timeout_falls_back_to_exact_cell_probes(self) -> None:
+        class DiversityTimeoutSolver(HexReasoningSolver):
+            def _solve_prepared_model(self, cp_solver, prepared):  # type: ignore[no-untyped-def]
+                if prepared.model.has_objective():
+                    return cp_model.UNKNOWN
+                return super()._solve_prepared_model(cp_solver, prepared)
+
+        x, y = (0, 0), (1, 0)
+        board = make_board(
+            {x: CellVisualType.HIDDEN, y: CellVisualType.HIDDEN},
+            [("A", [x, y], ClueType.COUNT, 1)],
+        )
+
+        moves = DiversityTimeoutSolver().solve(board)
+
+        self.assertEqual([], moves)
+
+    def test_global_worker_count_must_be_positive(self) -> None:
+        with self.assertRaisesRegex(ValueError, "至少需要 1 个工作线程"):
+            HexReasoningSolver(feasibility_workers=0)
 
     def test_global_uniqueness_runs_only_after_every_local_tier_is_empty(self) -> None:
         class GlobalTrackingSolver(HexReasoningSolver):

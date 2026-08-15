@@ -169,7 +169,7 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Easy seed 1 dense-board capture passed visual inspection.
 - [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
 - [x] 0.7.3 onboarding and 0.7.4 white startup dropdown passed native Windows Qt visual inspection at their recorded logical sizes and device pixel ratios.
-- [x] Eighty-five automated core, cache, bridge, solver, session-store and Qt workflow tests pass.
+- [x] Ninety automated core, cache, bridge, solver, session-store and Qt workflow tests pass.
 - [x] Full-screen long-reason bottom capture and end-cursor visibility check pass.
 - [x] Hidden, blue and excluded buttons render black, orange and blue active outlines respectively.
 - [x] Original-style mouse controls persist, map real left/right clicks, toggle back to unknown, and restore manual tools when disabled.

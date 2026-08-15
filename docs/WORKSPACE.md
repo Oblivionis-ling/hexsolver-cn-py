@@ -31,7 +31,7 @@ F:\SteamLibrary\steamapps\common\Hexcells Infinite
 
 - `.conda_env/`：当前一键启动环境，可由 `run.ps1` 重建；
 - `managed_core/bin/`：Easy 托管核心构建产物，可由 `managed_core/build.ps1` 重建；
-- `dist/`：只保留最新 0.8.1 单文件成品与 SHA-256；
+- `dist/`：只保留最新 0.8.2 单文件成品与 SHA-256；
 - `build/`：PyInstaller 中间目录，发布验证后删除，需要时可由 `packaging/build_app.ps1` 重建；
 - `tests/images/`、`tests/labels/`：含原版游戏截图的 OCR 本地数据；
 - `tests/reports/`：临时视觉 QA 输出；
@@ -132,6 +132,14 @@ Easy 托管核心的真实集成校验仍需要合法安装中的 `Assembly-CSha
 - `docs/design/` 增加浅色确认框和 Hard seed 3 全局理由两张原生 Windows Qt 证据。
 - 原路线图中的 0.8.1 性能优化顺延为 0.8.2，导入导出与诊断顺延为 0.8.3；当前版本不包含这些尚未实现的范围。
 - 源码、版本资源、单文件成品与发布文件名统一为 `0.8.1`；生成器、求解规则、全局门禁、缓存格式和私有答案隔离没有变化。
+
+## 2026-08-15 0.8.2 更新
+
+- `tools/benchmark_solver_performance.py` 保留 0.8.1 基线实现和可复现的三轮线程对照；`docs/performance/V082_EXPERIMENTS.md` 保存环境、原始数据、正确性门禁和方案取舍。
+- 全局求解改为同局面单模型、基础合法解见证、相反值探测和 25 ms 最大差异合法解；短时搜索失败时自动回退，不牺牲结论确定性。
+- 单线程在代表夹具和用户现场局面上都快于多线程，因而不增加高资源开关；空闲预计算也没有进入产品。
+- 0.9.0 的视觉原型盘面准确性仍待评审，本次没有修改或继续实现这些方案。
+- 源码、版本资源与发布文件名统一为 `0.8.2`；地图生成、规则、步骤顺序、解释、缓存格式和私有答案隔离不变。
 
 ## 清理原则
 
