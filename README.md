@@ -1,17 +1,17 @@
 # HexInfinite 种子求解器
 
-当前版本：`0.8.1`
+当前版本：`0.8.2`
 
 这是一个面向 `Hexcells Infinite` 的 Windows 中文逐步求解器。输入种子号并选择 Easy/Hard 后，程序会在本地复刻原版地图，不再启动 `Hexcells Infinite.exe`；你可以手动同步当前进度，然后每次只获取一个必然步骤和中文理由。
 
 ## 下载 Windows 单文件版
 
-从 [GitHub Release v0.8.1](https://github.com/Oblivionis-ling/hexsolver-cn-py/releases/tag/v0.8.1) 下载：
+从 [GitHub Release v0.8.2](https://github.com/Oblivionis-ling/hexsolver-cn-py/releases/tag/v0.8.2) 下载：
 
-- `HexInfiniteSolver-0.8.1-windows-x64.exe`
-- `HexInfiniteSolver-0.8.1-windows-x64.exe.sha256`
+- `HexInfiniteSolver-0.8.2-windows-x64.exe`
+- `HexInfiniteSolver-0.8.2-windows-x64.exe.sha256`
 
-无需安装 Python、Conda 或项目依赖，下载后直接双击 EXE。`0.8.1` 将确认操作统一为高对比度浅色中文弹窗，并重写全局唯一性说明的阅读结构；Easy/Hard 地图生成、求解规则、全局唯一性门禁和推理结论保持不变。
+无需安装 Python、Conda 或项目依赖，下载后直接双击 EXE。`0.8.2` 保留 0.8.1 的浅色确认框和易读全局说明，并通过见证解、同局面模型复用和短时最大差异合法解显著减少全局唯一性检查；地图生成、规则、步骤顺序、解释和推理结论保持不变。
 
 系统要求：Windows 10/11 x64。Hard 完全离线可用；Easy 仍需要本机合法安装 Steam 版 `Hexcells Infinite`，程序只读其 `Assembly-CSharp.dll` 并校验版本，不会把原游戏 DLL、EXE 或存档打进安装包。由于当前成品未做商业代码签名，Windows 首次下载时可能显示 SmartScreen 提示；请用 Release 同时提供的 SHA-256 文件核对完整性。
 
@@ -39,6 +39,7 @@
 - 下一步严格按“局部计数 → 排列 → 子集差分 → 全场剩余 → 全局唯一性”逐层短路；找到更简单的全场必然步后，不再计算更复杂层级。
 - 一次只高亮一个必然步骤，并显示可滚动、可核查的中文推理过程。
 - 全局唯一性理由先给出结论和试填反证摘要，再提供关键条件、完整坐标核查与术语说明；第一次阅读可以跳过详细核查。
+- 全局唯一性检查复用同一盘面的 CP-SAT 模型，只验证基础合法解的相反值，并用第二份合法解批量排除非固定格；代表 Hard 完整回放约快 10.8 倍，超时会安全回退。
 - 恢复局面、清除进度和删除缓存均使用不受系统深色主题影响的浅色确认框，按钮直接说明操作结果。
 - 应用当前建议的勾选按钮不再弹出悬停说明；功能保持为直接把当前必然步应用到本地盘面，并保留无障碍名称。
 - 推理中的单个坐标、完整坐标数组和“横向 / 左下斜 / 右下斜”行引用可与棋盘联动；悬停不弹提示框，使用外层轻柔光与内层细虚线做一次性淡入预览，点击固定后改为静态实线、文字加粗，数组成员会作为一个整体同时高亮。
@@ -72,13 +73,13 @@ Easy 托管程序集固定检查以下基线：
 D:\Desktop\HexInfinite\reverse_harness\game
 ```
 
-当前验证结果：Easy/Hard seed 1–50 的最终 TSV 均逐字段一致，并额外通过 `00000000`、`99999999` 两个边界种子；Hard 样本覆盖五种地图形状。`0.4.1` 修正棋盘上下镜像，`0.4.2` 同步修正左右斜向标签，`0.4.3` 加入详细可核查推理；`0.5.0` 至 `0.7.1` 逐步完善封装、显示、缓存、输入和推理联动；`0.7.2` 优化推理层级调度；`0.7.3–0.7.4` 调整启动、设置和新手引导体验；`0.8.0` 增加后台推理、局面存取及完整撤销/重做；`0.8.1` 改善确认框和全局理由的表达与排版。`0.8.1` 未改变规则定义、地图生成、全局唯一性门禁、推理结论或私有答案隔离。seed 1/2 已与现有官方截图逐个核对轮廓和线索方位。`reverse_harness` 中的原版运行时桥只保留为显式差分校验工具，不在默认产品链路中。
+当前验证结果：Easy/Hard seed 1–50 的最终 TSV 均逐字段一致，并额外通过 `00000000`、`99999999` 两个边界种子；Hard 样本覆盖五种地图形状。`0.4.1` 修正棋盘上下镜像，`0.4.2` 同步修正左右斜向标签，`0.4.3` 加入详细可核查推理；`0.5.0` 至 `0.7.1` 逐步完善封装、显示、缓存、输入和推理联动；`0.7.2` 优化推理层级调度；`0.7.3–0.7.4` 调整启动、设置和新手引导体验；`0.8.0` 增加后台推理、局面存取及完整撤销/重做；`0.8.1` 改善确认框和全局理由的表达与排版；`0.8.2` 在不改变结论的前提下优化全局求解性能。seed 1/2 已与现有官方截图逐个核对轮廓和线索方位。`reverse_harness` 中的原版运行时桥只保留为显式差分校验工具，不在默认产品链路中。
 
 性能边界：Easy 通常不到 1 秒；Hard 会忠实重放原版的多轮可解性验证与冗余线索裁剪，小图约数秒，少数复杂种子可能需要几十秒。首次生成始终在 UI 后台线程中执行；成功结果会自动缓存，相同 Build、后端、难度和种子的后续加载通常只需读取本地 JSON。
 
 ## 启动
 
-普通用户优先使用 Release 中的 `HexInfiniteSolver-0.8.1-windows-x64.exe`，直接双击即可。
+普通用户优先使用 Release 中的 `HexInfiniteSolver-0.8.2-windows-x64.exe`，直接双击即可。
 
 以下方式用于源码开发：
 
@@ -158,7 +159,7 @@ conda run -n hexsolver-cn python main.py
 .\test.ps1
 ```
 
-构建并验证 0.8.1 单文件成品：
+构建并验证 0.8.2 单文件成品：
 
 ```powershell
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\build_app.ps1
@@ -166,7 +167,15 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 
 构建脚本会执行源码测试、构建 Easy 托管核心、生成单文件 EXE、检查归档不含原游戏程序集，并启动真实成品完成 UI + Easy/Hard seed 1 冒烟测试。详细边界见 [Windows 打包与发布](docs/PACKAGING.md)。
 
-当前 85 项自动测试覆盖原有生成、求解和 UI 回归，并包含撤销/重做、存档门禁、后台推理、浅色确认框、中文按钮和新版全局理由结构。Easy/Hard seed 1–50 及两个八位边界种子已做原版逐字段差分；代表种子还会完整解到零未知格并逐步核对私有答案。
+当前 90 项自动测试覆盖原有生成、求解和 UI 回归，并包含撤销/重做、存档门禁、后台推理、浅色确认框、新版全局理由结构、单模型复用、相反值检查、差异见证和超时安全回退。Easy/Hard seed 1–50 及两个八位边界种子已做原版逐字段差分；代表种子还会完整解到零未知格并逐步核对私有答案。
+
+复现 0.8.2 性能对照：
+
+```powershell
+.\.conda_env\python.exe .\tools\benchmark_solver_performance.py --repeat 3 --workers 1,2,4,8,12 --include-local-autosave
+```
+
+环境、原始数据、正确性门禁和未采用方案见 [0.8.2 性能试验记录](docs/performance/V082_EXPERIMENTS.md)。
 
 仓库自带 `tests/fixtures/` 的 Easy/Hard seed 1 结构化夹具。没有原版程序集时，Easy 托管核心的真实集成项会明确跳过，其余单元测试和 Hard 离线测试仍可运行。
 
@@ -213,13 +222,14 @@ HexReasoningSolver.next_step()
 - `src/hexsolver_cn/hard_generator.py`：Hard 初始形状、颜色与 Unity 随机序列。
 - `managed_core/`：C# 最小 Unity API 兼容层、Easy 宿主和一键构建脚本。
 - `tools/doctor.py`：离线后端诊断；原版启动差分必须显式启用。
-- `packaging/`：0.8.1 Windows 单文件构建、图标/版本资源和成品冒烟测试入口。
+- `packaging/`：0.8.2 Windows 单文件构建、图标/版本资源和成品冒烟测试入口。
 
 ## 文档
 
-- [开发历史](DEVELOPMENT_HISTORY.md)：从 `0.1.0` 截图原型到当前 `0.8.1` 版本。
+- [开发历史](DEVELOPMENT_HISTORY.md)：从 `0.1.0` 截图原型到当前 `0.8.2` 版本。
 - [工作区说明](docs/WORKSPACE.md)：本地目录、专有文件边界、清理与恢复规则。
 - [求解算法](docs/solver/ALGORITHM.md)：局部规则、CP-SAT 和全局反证。
+- [0.8.2 性能试验](docs/performance/V082_EXPERIMENTS.md)：可复现基准、线程对照、正确性门禁和方案取舍。
 - [Windows 打包与发布](docs/PACKAGING.md)：单文件内容、构建、验证和专有文件边界。
 - [种子开发清单](docs/generator/IMPLEMENTATION_PLAN.md)：实现模块与验收标准。
 - [完整文档索引](docs/README.md)。

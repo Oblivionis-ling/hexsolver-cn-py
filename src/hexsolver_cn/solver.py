@@ -39,6 +39,12 @@ class ConstraintSpec:
     is_global_remaining: bool = False
 
 
+@dataclass
+class _PreparedGlobalModel:
+    model: cp_model.CpModel
+    variables: Dict[Coord, cp_model.IntVar]
+
+
 class SolverError(RuntimeError):
     pass
 
@@ -48,6 +54,8 @@ class SolverCancelled(SolverError):
 
 
 class HexReasoningSolver:
+    DIVERSITY_SEARCH_SECONDS = 0.025
+
     SOURCE_PRIORITY = {
         "局部必然": 0,
         "排列推理": 1,
@@ -56,8 +64,16 @@ class HexReasoningSolver:
         "全局求解": 4,
     }
 
-    def __init__(self, cancel_requested: Optional[Callable[[], bool]] = None) -> None:
+    def __init__(
+        self,
+        cancel_requested: Optional[Callable[[], bool]] = None,
+        *,
+        feasibility_workers: int = 1,
+    ) -> None:
+        if feasibility_workers < 1:
+            raise ValueError("全局可行性检查至少需要 1 个工作线程。")
         self._cancel_requested = cancel_requested or (lambda: False)
+        self._feasibility_workers = int(feasibility_workers)
 
     def _check_cancelled(self) -> None:
         cancel_requested = getattr(self, "_cancel_requested", None)
@@ -332,69 +348,154 @@ class HexReasoningSolver:
         board: Board,
         limit: Optional[int] = None,
     ) -> List[SuggestedMove]:
-        satisfiable, _ = self._solve_model(board)
-        if not satisfiable:
+        prepared = self._prepare_global_model(board)
+        solver = self._new_feasibility_solver()
+        status = self._solve_prepared_model(solver, prepared)
+        if status == cp_model.INFEASIBLE:
             raise SolverError("当前线索组合无解。请先检查 OCR 结果、行线索录入和剩余蓝格数。")
+        if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            raise self._global_timeout_error()
+
+        # One feasible assignment is enough to establish one legal value for
+        # every hidden cell.  A cell is forced iff the opposite value is
+        # infeasible, so testing both colors (as the pre-0.8.2 implementation
+        # did) duplicates half of the SAT work without adding evidence.
+        witness = {
+            coord: bool(solver.Value(variable))
+            for coord, variable in prepared.variables.items()
+        }
+        flexible_coords = self._find_witness_variations(prepared, witness)
 
         forced_moves: List[SuggestedMove] = []
         hidden_cells = sorted(board.hidden_cells(), key=lambda cell: (cell.coord[1], cell.coord[0]))
         for cell in hidden_cells:
             self._check_cancelled()
-            can_blue = self._solve_with_assumption(board, cell.coord, True)
-            self._check_cancelled()
-            can_black = self._solve_with_assumption(board, cell.coord, False)
-            if can_blue and can_black:
+            # Two concrete legal assignments with different values already
+            # prove that this cell is not forced.  A short Hamming-distance
+            # search discovers many such cells in one bounded solve.
+            if cell.coord in flexible_coords:
                 continue
-            if can_blue:
-                forced_moves.append(
-                    SuggestedMove(
-                        coord=cell.coord,
-                        action=MoveAction.MARK_BLUE,
-                        reason=self._global_reason(board, cell.coord, MoveAction.MARK_BLUE),
-                        source="全局求解",
-                    )
+            legal_value = witness[cell.coord]
+            target = prepared.variables[cell.coord]
+            prepared.model.clear_assumptions()
+            prepared.model.add_assumption(target.Not() if legal_value else target)
+            status = self._solve_prepared_model(solver, prepared)
+            if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+                continue
+            if status != cp_model.INFEASIBLE:
+                raise self._global_timeout_error()
+
+            action = MoveAction.MARK_BLUE if legal_value else MoveAction.MARK_BLACK
+            forced_moves.append(
+                SuggestedMove(
+                    coord=cell.coord,
+                    action=action,
+                    reason=self._global_reason(board, cell.coord, action),
+                    source="全局求解",
                 )
-            elif can_black:
-                forced_moves.append(
-                    SuggestedMove(
-                        coord=cell.coord,
-                        action=MoveAction.MARK_BLACK,
-                        reason=self._global_reason(board, cell.coord, MoveAction.MARK_BLACK),
-                        source="全局求解",
-                    )
-                )
+            )
             if limit is not None and len(forced_moves) >= limit:
                 break
+        prepared.model.clear_assumptions()
         return forced_moves
+
+    def _find_witness_variations(
+        self,
+        prepared: _PreparedGlobalModel,
+        witness: Dict[Coord, bool],
+    ) -> set[Coord]:
+        if not witness:
+            return set()
+        prepared.model.clear_assumptions()
+        distance_terms = [
+            variable if not witness[coord] else 1 - variable
+            for coord, variable in prepared.variables.items()
+        ]
+        prepared.model.maximize(sum(distance_terms))
+        try:
+            solver = self._new_feasibility_solver(
+                timeout_seconds=self.DIVERSITY_SEARCH_SECONDS,
+            )
+            status = self._solve_prepared_model(solver, prepared)
+            if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+                return set()
+            return {
+                coord
+                for coord, variable in prepared.variables.items()
+                if bool(solver.Value(variable)) != witness[coord]
+            }
+        finally:
+            prepared.model.clear_objective()
+
+    def _prepare_global_model(self, board: Board) -> _PreparedGlobalModel:
+        model = cp_model.CpModel()
+        variables: Dict[Coord, cp_model.IntVar] = {
+            cell.coord: model.NewBoolVar(f"cell_{cell.coord[0]}_{cell.coord[1]}")
+            for cell in board.hidden_cells()
+        }
+        for spec in self._all_model_specs(board):
+            sequence = [
+                self._expr_for_coord(model, board, variables, coord)
+                for coord in spec.coords
+            ]
+            self._add_constraint(
+                model,
+                sequence,
+                spec.number,
+                spec.clue_type,
+                spec.cyclic,
+            )
+        return _PreparedGlobalModel(model=model, variables=variables)
+
+    def _new_feasibility_solver(
+        self,
+        *,
+        timeout_seconds: float = 5.0,
+    ) -> cp_model.CpSolver:
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = timeout_seconds
+        solver.parameters.num_search_workers = getattr(
+            self,
+            "_feasibility_workers",
+            1,
+        )
+        return solver
+
+    def _solve_prepared_model(
+        self,
+        solver: cp_model.CpSolver,
+        prepared: _PreparedGlobalModel,
+    ) -> int:
+        self._check_cancelled()
+        status = solver.Solve(prepared.model)
+        self._check_cancelled()
+        return status
+
+    @staticmethod
+    def _global_timeout_error() -> SolverError:
+        return SolverError("全局约束检查未在 5 秒内得到确定结论；本次不会把超时误判成必然步。")
 
     def _solve_model(
         self,
         board: Board,
         assumption: Optional[Tuple[Coord, bool]] = None,
     ) -> Tuple[bool, Dict[Coord, int]]:
-        self._check_cancelled()
-        model = cp_model.CpModel()
-        variables: Dict[Coord, cp_model.IntVar] = {}
-        for cell in board.hidden_cells():
-            variables[cell.coord] = model.NewBoolVar(f"cell_{cell.coord[0]}_{cell.coord[1]}")
+        prepared = self._prepare_global_model(board)
+        if assumption is not None and assumption[0] in prepared.variables:
+            prepared.model.Add(
+                prepared.variables[assumption[0]] == int(assumption[1])
+            )
 
-        for spec in self._all_model_specs(board):
-            sequence = [self._expr_for_coord(model, board, variables, coord) for coord in spec.coords]
-            self._add_constraint(model, sequence, spec.number, spec.clue_type, spec.cyclic)
-
-        if assumption is not None and assumption[0] in variables:
-            model.Add(variables[assumption[0]] == int(assumption[1]))
-
-        solver = cp_model.CpSolver()
-        solver.parameters.max_time_in_seconds = 5.0
-        solver.parameters.num_search_workers = 8
-        status = solver.Solve(model)
-        self._check_cancelled()
+        solver = self._new_feasibility_solver()
+        status = self._solve_prepared_model(solver, prepared)
         if status == cp_model.INFEASIBLE:
             return False, {}
         if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-            raise SolverError("全局约束检查未在 5 秒内得到确定结论；本次不会把超时误判成必然步。")
-        return True, {coord: solver.Value(var) for coord, var in variables.items()}
+            raise self._global_timeout_error()
+        return True, {
+            coord: solver.Value(variable)
+            for coord, variable in prepared.variables.items()
+        }
 
     def _solve_with_assumption(self, board: Board, coord: Coord, value: bool) -> bool:
         satisfiable, _ = self._solve_model(board, assumption=(coord, value))
