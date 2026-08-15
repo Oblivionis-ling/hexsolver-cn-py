@@ -24,14 +24,14 @@ F:\SteamLibrary\steamapps\common\Hexcells Infinite
 - Python 应用、Hard 纯 Python 生成器和 Easy 无 Unity 托管宿主源码；
 - 一键启动、依赖、诊断和测试；
 - `tests/fixtures/` 中两个小型结构化 TSV 回归夹具；
-- `docs/images/` 中两张生成结果证据，以及 `docs/design/` 中当前启动说明、白底下拉选择器和 0.8.0 局面进度界面证据；
+- `docs/images/` 中两张生成结果证据，以及 `docs/design/` 中当前启动说明、白底下拉选择器、浅色确认框和易读全局理由界面证据；
 - 开发历史、算法、路线、设计验收和研究资料。
 
 以下内容有用但只保留在本地，并由 `.gitignore` 排除：
 
 - `.conda_env/`：当前一键启动环境，可由 `run.ps1` 重建；
 - `managed_core/bin/`：Easy 托管核心构建产物，可由 `managed_core/build.ps1` 重建；
-- `dist/`：只保留最新 0.8.0 单文件成品与 SHA-256；
+- `dist/`：只保留最新 0.8.1 单文件成品与 SHA-256；
 - `build/`：PyInstaller 中间目录，发布验证后删除，需要时可由 `packaging/build_app.ps1` 重建；
 - `tests/images/`、`tests/labels/`：含原版游戏截图的 OCR 本地数据；
 - `tests/reports/`：临时视觉 QA 输出；
@@ -124,6 +124,14 @@ Easy 托管核心的真实集成校验仍需要合法安装中的 `Assembly-CSha
 - 新增的自动存档默认写入 `%LOCALAPPDATA%\HexInfiniteSolver\sessions`，不进入仓库；测试、截图工具和成品冒烟均使用独立临时目录。
 - 本地 `dist/` 与 GitHub Release 仍只保留最新正式版；完成冻结构建后以 0.8.0 EXE 和 SHA-256 替换 0.7.4 资产。
 - 三种启动模式、持久化、求解器、生成器、缓存格式和私有答案隔离没有变化。
+
+## 2026-08-15 0.8.1 更新
+
+- 恢复局面、清除进度和删除缓存使用统一浅色确认框，避免 Windows 深色系统主题把确认操作显示成突兀的深色块。
+- 全局唯一性理由改为先结论、再试填反证，完整条件与坐标继续保留在可跳过的详细核查中；棋盘联动语义不变。
+- `docs/design/` 增加浅色确认框和 Hard seed 3 全局理由两张原生 Windows Qt 证据。
+- 原路线图中的 0.8.1 性能优化顺延为 0.8.2，导入导出与诊断顺延为 0.8.3；当前版本不包含这些尚未实现的范围。
+- 源码、版本资源、单文件成品与发布文件名统一为 `0.8.1`；生成器、求解规则、全局门禁、缓存格式和私有答案隔离没有变化。
 
 ## 清理原则
 

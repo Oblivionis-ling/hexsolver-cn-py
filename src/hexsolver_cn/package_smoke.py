@@ -15,7 +15,17 @@ from .app import (
     STEP_REASON_BOTTOM_SAFE_MARGIN,
     show_window_for_startup,
 )
-from .models import CellVisualType, MoveAction, SuggestedMove
+from .dialogs import LightConfirmDialog
+from .models import (
+    Board,
+    Cell,
+    CellVisualType,
+    ClueType,
+    LineFamily,
+    MoveAction,
+    RowClue,
+    SuggestedMove,
+)
 from .original_bridge import build_default_seed_registry
 from .preferences import AppPreferences, StartupWindowMode
 from .reason_interaction import ReasonReferenceKind
@@ -86,6 +96,89 @@ def _verify_reason_bottom_safe_area(window: MainWindow, app: QApplication) -> No
         < STEP_REASON_BOTTOM_SAFE_MARGIN
     ):
         raise RuntimeError("打包界面缺少推理正文末尾安全区。")
+
+
+def _verify_v081_confirmation_and_global_reason(
+    window: MainWindow,
+    app: QApplication,
+) -> None:
+    dialog = LightConfirmDialog(
+        window,
+        title="发现未完成的局面",
+        message="检测到上一次自动保存的局面，要从这里继续吗？",
+        detail="继续会恢复盘面；放弃会删除自动保存。",
+        accept_text="继续局面",
+        reject_text="放弃并查看说明",
+    )
+    try:
+        dialog.show()
+        app.processEvents()
+        if (
+            "background-color: #FFFFFF" not in dialog.styleSheet()
+            or dialog.accept_button.text() != "继续局面"
+            or dialog.reject_button.text() != "放弃并查看说明"
+            or not dialog.accept_button.isDefault()
+        ):
+            raise RuntimeError("0.8.1 浅色确认框或中文操作按钮没有进入冻结成品。")
+    finally:
+        dialog.close()
+
+    coords = ((0, 0), (1, 0), (0, 1), (1, 1))
+    cells = {
+        coord: Cell(
+            cell_id=index,
+            coord=coord,
+            center=(float(coord[0]), float(coord[1])),
+            visual_type=CellVisualType.HIDDEN,
+        )
+        for index, coord in enumerate(coords)
+    }
+    clue_specs = (
+        ("A", [coords[0], coords[1]], 1),
+        ("B", [coords[1], coords[2]], 1),
+        ("C", [coords[0], coords[2], coords[3]], 2),
+    )
+    board = Board(
+        image_path="",
+        image_size=(1, 1),
+        cells=cells,
+        row_clues=[
+            RowClue(
+                line_id=line_id,
+                family=LineFamily.HORIZONTAL,
+                line_key=index,
+                coords=list(row_coords),
+                anchor=(0.0, 0.0),
+                clue_text=str(clue_number),
+                clue_type=ClueType.COUNT,
+                clue_number=clue_number,
+            )
+            for index, (line_id, row_coords, clue_number) in enumerate(clue_specs)
+        ],
+        origin=(0.0, 0.0),
+        basis_a=(1.0, 0.0),
+        basis_b=(0.0, 1.0),
+        ring_threshold=1.0,
+    )
+    move = window.solver.next_step(board)
+    required_sections = (
+        "结论先看",
+        "为什么这样判断",
+        "合法填法 = 0",
+        "关键条件概览",
+        "详细核查（第一次阅读可以先跳过）",
+        "术语说明",
+    )
+    if (
+        move is None
+        or move.source != "全局求解"
+        or any(section not in move.reason for section in required_sections)
+    ):
+        raise RuntimeError("0.8.1 全局唯一性理由结构没有进入冻结成品。")
+    window._set_step_reason(move.reason)
+    app.processEvents()
+    if window.step_reason.toPlainText() != move.reason:
+        raise RuntimeError("冻结成品显示全局唯一性理由时改变了原始解释内容。")
 
 
 def _verify_manual_outline_colors(window: MainWindow, app: QApplication) -> None:
@@ -294,6 +387,7 @@ def run_package_smoke_test() -> int:
         if window.step_reason.geometry().bottom() >= window.step_action_bar.geometry().top():
             raise RuntimeError("打包界面的推理正文进入了底部按钮区域。")
         _verify_reason_bottom_safe_area(window, app)
+        _verify_v081_confirmation_and_global_reason(window, app)
         if any(button.size() != QSize(60, 56) for button in window.state_buttons.values()):
             raise RuntimeError("打包界面的手动标记图例没有缩小。")
         if SCREENSHOT_IMPORT_ENABLED or window.stage.import_button.isEnabled():
