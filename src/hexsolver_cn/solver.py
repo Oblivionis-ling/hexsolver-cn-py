@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from ortools.sat.python import cp_model
 
@@ -43,6 +43,16 @@ class ConstraintSpec:
 class _PreparedGlobalModel:
     model: cp_model.CpModel
     variables: Dict[Coord, cp_model.IntVar]
+
+
+@dataclass(frozen=True)
+class PublicConstraintConflict:
+    """A sufficient public-information conflict caused by simulated marks."""
+
+    assumption_coords: Tuple[Coord, ...]
+    constraint_labels: Tuple[str, ...]
+    constraint_coords: Tuple[Coord, ...]
+    base_board_inconsistent: bool = False
 
 
 class SolverError(RuntimeError):
@@ -95,6 +105,109 @@ class HexReasoningSolver:
                 return sorted(tier_moves.values(), key=self._move_sort_key)[0]
         global_moves = self._collect_global_forced_moves(board, limit=1)
         return global_moves[0] if global_moves else None
+
+    def find_public_conflict(
+        self,
+        board: Board,
+        assumptions: Mapping[Coord, CellVisualType],
+    ) -> Optional[PublicConstraintConflict]:
+        """Check simulated marks using only constraints already public on ``board``.
+
+        The returned coordinates form a sufficient, not necessarily minimum,
+        conflicting assumption set.  No private reveal or generated answer is
+        accepted by this API, which keeps simulation conflict feedback inside
+        the same public-information boundary as normal reasoning.
+        """
+
+        self._check_cancelled()
+        model = cp_model.CpModel()
+        variables: Dict[Coord, cp_model.IntVar] = {
+            cell.coord: model.NewBoolVar(f"simulation_cell_{cell.coord[0]}_{cell.coord[1]}")
+            for cell in board.hidden_cells()
+        }
+        specs = self._all_model_specs(board)
+        spec_by_literal: Dict[int, ConstraintSpec] = {}
+        for index, spec in enumerate(specs):
+            active = model.NewBoolVar(f"simulation_constraint_{index}")
+            sequence = [
+                self._expr_for_coord(model, board, variables, coord)
+                for coord in spec.coords
+            ]
+            self._add_constraint(
+                model,
+                sequence,
+                spec.number,
+                spec.clue_type,
+                spec.cyclic,
+                active=active,
+            )
+            model.AddAssumption(active)
+            spec_by_literal[active.Index()] = spec
+
+        coord_by_literal: Dict[int, Coord] = {}
+        for index, (coord, state) in enumerate(
+            sorted(assumptions.items(), key=lambda item: (item[0][1], item[0][0]))
+        ):
+            if state not in {CellVisualType.BLUE, CellVisualType.BLACK}:
+                raise SolverError(f"模拟假设 {coord} 只能是蓝格或排除格。")
+            variable = variables.get(coord)
+            if variable is None:
+                raise SolverError(f"模拟假设 {coord} 不是起始盘面的未知格。")
+            active = model.NewBoolVar(f"simulation_assumption_{index}")
+            model.Add(variable == int(state is CellVisualType.BLUE)).OnlyEnforceIf(active)
+            model.AddAssumption(active)
+            coord_by_literal[active.Index()] = coord
+
+        solver = self._new_feasibility_solver()
+        solver.parameters.core_minimization_level = 2
+        status = self._solve_prepared_model(
+            solver,
+            _PreparedGlobalModel(model=model, variables=variables),
+        )
+        if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            return None
+        if status != cp_model.INFEASIBLE:
+            raise SolverError(
+                "公开约束矛盾检查未在 5 秒内得到确定结论；本次不会把超时误报为矛盾。"
+            )
+
+        core_specs: List[ConstraintSpec] = []
+        core_coords: List[Coord] = []
+        for literal in solver.SufficientAssumptionsForInfeasibility():
+            literal_index = literal if literal >= 0 else -literal - 1
+            spec = spec_by_literal.get(literal_index)
+            if spec is not None:
+                core_specs.append(spec)
+            coord = coord_by_literal.get(literal_index)
+            if coord is not None:
+                core_coords.append(coord)
+
+        # A core should contain public constraints whenever it is infeasible,
+        # but retaining their labels is more useful than returning an empty
+        # explanation if a future OR-Tools version reports a coarser core.
+        if not core_specs:
+            core_specs = specs
+        labels = tuple(dict.fromkeys(spec.label for spec in core_specs))
+        constraint_coords = tuple(
+            sorted(
+                {
+                    coord
+                    for spec in core_specs
+                    for coord in spec.coords
+                    if board.get_cell(coord) is not None
+                },
+                key=lambda coord: (coord[1], coord[0]),
+            )
+        )
+        assumption_coords = tuple(
+            sorted(set(core_coords), key=lambda coord: (coord[1], coord[0]))
+        )
+        return PublicConstraintConflict(
+            assumption_coords=assumption_coords,
+            constraint_labels=labels,
+            constraint_coords=constraint_coords,
+            base_board_inconsistent=not assumption_coords,
+        )
 
     def _move_sort_key(self, move: SuggestedMove) -> Tuple[int, int, int, str]:
         return (

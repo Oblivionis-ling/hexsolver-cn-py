@@ -52,6 +52,8 @@ class HexBoardView(QGraphicsView):
         self._row_clue_items_by_key: dict[RowReferenceKey, QGraphicsSimpleTextItem] = {}
         self._reason_halo_items: Dict[Coord, QGraphicsPolygonItem] = {}
         self._reason_overlay_items: Dict[Coord, QGraphicsPolygonItem] = {}
+        self._simulation_conflict_halo_items: Dict[Coord, QGraphicsPolygonItem] = {}
+        self._simulation_conflict_overlay_items: Dict[Coord, QGraphicsPolygonItem] = {}
         self._reason_reference: Optional[ReasonReference] = None
         self._reason_pinned = False
         self._reason_animation_elapsed_ms = 0
@@ -65,6 +67,9 @@ class HexBoardView(QGraphicsView):
         )
         self._target: Optional[Coord] = None
         self._selected: Optional[Coord] = None
+        self._simulation_active = False
+        self._simulation_changed_coords: set[Coord] = set()
+        self._simulation_conflict_coords: set[Coord] = set()
         self._pan_origin: Optional[QPoint] = None
         self._auto_fit = True
 
@@ -73,6 +78,9 @@ class HexBoardView(QGraphicsView):
         self.board = board
         self._target = None
         self._selected = None
+        self._simulation_active = False
+        self._simulation_changed_coords.clear()
+        self._simulation_conflict_coords.clear()
         self._auto_fit = True
         self._rebuild_scene()
         QTimer.singleShot(0, self.fit_board)
@@ -85,6 +93,8 @@ class HexBoardView(QGraphicsView):
         self._row_clue_items_by_key.clear()
         self._reason_halo_items.clear()
         self._reason_overlay_items.clear()
+        self._simulation_conflict_halo_items.clear()
+        self._simulation_conflict_overlay_items.clear()
         if self.board is None:
             return
 
@@ -139,6 +149,28 @@ class HexBoardView(QGraphicsView):
             reason_overlay.setZValue(6)
             self._scene.addItem(reason_overlay)
             self._reason_overlay_items[cell.coord] = reason_overlay
+
+            simulation_conflict_halo = QGraphicsPolygonItem(
+                self._polygon(cx, cy, self._radius + 8.4)
+            )
+            simulation_conflict_halo.setPen(QPen(Qt.PenStyle.NoPen))
+            simulation_conflict_halo.setBrush(Qt.BrushStyle.NoBrush)
+            simulation_conflict_halo.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+            simulation_conflict_halo.setVisible(False)
+            simulation_conflict_halo.setZValue(6.7)
+            self._scene.addItem(simulation_conflict_halo)
+            self._simulation_conflict_halo_items[cell.coord] = simulation_conflict_halo
+
+            simulation_conflict_overlay = QGraphicsPolygonItem(
+                self._polygon(cx, cy, self._radius + 5.2)
+            )
+            simulation_conflict_overlay.setPen(QPen(Qt.PenStyle.NoPen))
+            simulation_conflict_overlay.setBrush(Qt.BrushStyle.NoBrush)
+            simulation_conflict_overlay.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+            simulation_conflict_overlay.setVisible(False)
+            simulation_conflict_overlay.setZValue(7.0)
+            self._scene.addItem(simulation_conflict_overlay)
+            self._simulation_conflict_overlay_items[cell.coord] = simulation_conflict_overlay
 
         self._draw_row_clues()
         self._ensure_row_clues_visible()
@@ -206,6 +238,34 @@ class HexBoardView(QGraphicsView):
         if self._reason_reference is None:
             return None
         return self._reason_reference.row_key
+
+    @property
+    def simulation_changed_coords(self) -> tuple[Coord, ...]:
+        return tuple(
+            sorted(self._simulation_changed_coords, key=lambda coord: (coord[1], coord[0]))
+        )
+
+    @property
+    def simulation_conflict_coords(self) -> tuple[Coord, ...]:
+        return tuple(
+            sorted(self._simulation_conflict_coords, key=lambda coord: (coord[1], coord[0]))
+        )
+
+    def set_simulation_state(
+        self,
+        active: bool,
+        *,
+        changed_coords: tuple[Coord, ...] = (),
+        conflict_coords: tuple[Coord, ...] = (),
+    ) -> None:
+        self._simulation_active = bool(active)
+        self._simulation_changed_coords = set(changed_coords) if active else set()
+        self._simulation_conflict_coords = set(conflict_coords) if active else set()
+        self.sync_state()
+
+    def set_simulation_conflict(self, coords: tuple[Coord, ...]) -> None:
+        self._simulation_conflict_coords = set(coords) if self._simulation_active else set()
+        self.sync_state()
 
     def set_reason_reference(
         self,
@@ -319,7 +379,10 @@ class HexBoardView(QGraphicsView):
             cell = self.board.get_cell(coord)
             if cell is None:
                 continue
-            item.setBrush(QColor(self._cell_color(cell.visual_type)))
+            fill = QColor(self._cell_color(cell.visual_type))
+            if self._simulation_active and coord in self._simulation_changed_coords:
+                fill.setAlpha(158)
+            item.setBrush(fill)
             text_item = self._cell_text_items.get(coord)
             if text_item is not None and text_item.text() != cell.clue_text:
                 text_item.setText(cell.clue_text)
@@ -330,9 +393,43 @@ class HexBoardView(QGraphicsView):
             elif coord == self._selected:
                 item.setPen(QPen(QColor(COLORS["orange"]), 4.0))
                 item.setZValue(3)
+            elif self._simulation_active and coord in self._simulation_changed_coords:
+                simulated_pen = QPen(
+                    QColor(COLORS["white"]),
+                    3.2,
+                    Qt.PenStyle.CustomDashLine,
+                    Qt.PenCapStyle.RoundCap,
+                    Qt.PenJoinStyle.RoundJoin,
+                )
+                simulated_pen.setDashPattern([2.0, 1.4])
+                item.setPen(simulated_pen)
+                item.setZValue(2)
             else:
                 item.setPen(QPen(QColor(COLORS["white"]), 3.2))
                 item.setZValue(1)
+        conflict_halo_pen = QPen(
+            QColor(COLORS["danger"]),
+            8.0,
+            Qt.PenStyle.SolidLine,
+            Qt.PenCapStyle.RoundCap,
+            Qt.PenJoinStyle.RoundJoin,
+        )
+        conflict_overlay_pen = QPen(
+            QColor(COLORS["danger"]),
+            3.6,
+            Qt.PenStyle.SolidLine,
+            Qt.PenCapStyle.RoundCap,
+            Qt.PenJoinStyle.RoundJoin,
+        )
+        for coord, halo in self._simulation_conflict_halo_items.items():
+            visible = self._simulation_active and coord in self._simulation_conflict_coords
+            halo.setPen(conflict_halo_pen if visible else QPen(Qt.PenStyle.NoPen))
+            halo.setOpacity(0.22)
+            halo.setVisible(visible)
+        for coord, overlay in self._simulation_conflict_overlay_items.items():
+            visible = self._simulation_active and coord in self._simulation_conflict_coords
+            overlay.setPen(conflict_overlay_pen if visible else QPen(Qt.PenStyle.NoPen))
+            overlay.setVisible(visible)
         self._ensure_row_clues_visible()
         self.viewport().update()
 

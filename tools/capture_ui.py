@@ -37,6 +37,8 @@ def main() -> None:
     parser.add_argument("--manual-state", choices=("hidden", "blue", "black"))
     parser.add_argument("--original-mouse-controls", action="store_true")
     parser.add_argument("--pin-reason-reference", choices=("row", "array"))
+    parser.add_argument("--simulation", action="store_true")
+    parser.add_argument("--simulation-conflict", action="store_true")
     args = parser.parse_args()
     if args.open_startup_dropdown and not args.settings:
         parser.error("--open-startup-dropdown requires --settings")
@@ -44,6 +46,8 @@ def main() -> None:
         parser.error("--settings and --confirmation-dialog cannot be used together")
     if args.first_global_suggestion and args.seed is None:
         parser.error("--first-global-suggestion requires --seed")
+    if (args.simulation or args.simulation_conflict) and args.seed is None:
+        parser.error("--simulation and --simulation-conflict require --seed")
 
     app = QApplication.instance() or QApplication([])
     app.setStyle("Fusion")
@@ -156,6 +160,29 @@ def main() -> None:
             "black": CellVisualType.BLACK,
         }[args.manual_state]
         window.state_buttons[state].click()
+        app.processEvents()
+    if args.simulation or args.simulation_conflict:
+        window.start_simulation()
+        deadline = time.monotonic() + 10.0
+        while window._simulation_conflict_thread is not None and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+        if args.simulation_conflict:
+            simulation = window.simulation_session
+            if simulation is None or simulation.initial_board.remaining_blue is None:
+                raise SystemExit("Current board cannot produce a simulation conflict capture.")
+            count = simulation.initial_board.remaining_blue + 1
+            for cell in simulation.board.hidden_cells()[:count]:
+                simulation.set_cell_state(cell.coord, CellVisualType.BLUE)
+            window._simulation_changed()
+            deadline = time.monotonic() + 10.0
+            while (
+                window._simulation_conflict_thread is not None
+                and time.monotonic() < deadline
+            ):
+                app.processEvents()
+                time.sleep(0.01)
+        window.stage.toast.hide()
         app.processEvents()
 
     target = window

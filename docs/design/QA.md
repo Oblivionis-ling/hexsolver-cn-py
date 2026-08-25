@@ -14,9 +14,10 @@
 - [`ui-v080-settings-progress-native.png`](ui-v080-settings-progress-native.png)：0.8.0 设置页局面与进度卡，显示自动恢复状态、手动保存/载入和清除进度入口。
 - [`ui-light-confirmation.png`](ui-light-confirmation.png)：0.8.1 自绘浅色恢复确认框，显示白底高对比度表面和“继续局面 / 放弃并查看说明”中文按钮。
 - [`ui-readable-global-reason.png`](ui-readable-global-reason.png)：0.8.1 Hard seed 3 的首个全局唯一性步骤，首屏先显示结论、试填反证与关键条件概览。
+- [`ui-v090-simulation-conflict.png`](ui-v090-simulation-conflict.png)：0.9.0 原生 Windows Qt 模拟推演状态，显示模式提示、半透明模拟填块、公开约束冲突集合、负数模拟剩余和唯一退出操作。
 - Onboarding implementation pixels: `1440 × 1024` at device pixel ratio `1.0`.
 - 0.7.4 settings evidence pixels: `1440 × 1200`; logical dialog viewport: `720 × 600` at device pixel ratio `2.0`.
-- 仓库保留 0.7.3 启动说明、0.7.4 白底下拉菜单、0.8.0 局面进度卡以及 0.8.1 的确认框和全局理由作为当前应用界面证据；0.7.1 的分层联动高亮继续由自动回归、成品冒烟和下方历史记录验证。
+- 仓库保留 0.7.3 启动说明、0.7.4 白底下拉菜单、0.8.0 局面进度卡、0.8.1 的确认框和全局理由，以及 0.9.0 的模拟冲突状态作为当前应用界面证据；0.7.1 的分层联动高亮继续由自动回归、成品冒烟和下方历史记录验证。
 
 **Normalized comparison**
 
@@ -36,6 +37,7 @@ No actionable P0, P1, or P2 differences remain for the selected information arch
 - Icons and interaction states: copy, import, undo, reset, zoom, fit, settings, next, apply, selected difficulty, selected manual state, original-mouse toggle, and target-cell states are present and visually distinct.
 - Accessibility: controls use native Qt semantics and keyboard focus behavior, retain high-contrast active states, and use practical click targets. 推理引用既支持点击也支持 Enter/空格；其悬停提示框已完全取消，棋盘预览只做一次有限淡入，系统禁用控件动画或设置 `HEXSOLVER_REDUCED_MOTION=1` 时直接显示静态结果，固定态仍以实线和字重表达。
 - Onboarding and startup: the initial board is intentionally empty rather than a fake puzzle. Four text callouts use the existing orange/cyan tokens, double-stroke hand-drawn arrows and circled endpoints; the explanation can be closed, reopened from settings, and disappears automatically after a verified seed board loads. The startup selector is collapsed by default, uses a white surface and explicit chevron, and reveals windowed maximized, borderless full-screen and normal-window choices in a white popup with a light-cyan current/hover state.
+- Simulation mode: a persistent orange text banner, “模拟标记” label, translucent dashed assumptions and a single “结束模拟推演” action make the temporary branch explicit without relying on color alone. Public conflicts use a static red double outline and matching explanation; no continuous animation is required, and the normal reason viewport height is unchanged.
 
 The current Hard runtime capture now shows the same intended content class as the source: a wide irregular generated puzzle and `39` remaining. Easy was separately checked with a much denser 226-cell board; auto-fit keeps the complete puzzle and all line clues visible.
 
@@ -159,6 +161,13 @@ The current Hard runtime capture now shows the same intended content class as th
 - 正文调整为 14 px、145% 行高和更深文字，分区标题加粗并增加留白；Hard seed 3 的原生 Windows Qt 截图确认结论与反证摘要无需先阅读长坐标列表即可理解。
 - 85 项源码回归检查弹窗表面与按钮、恢复分支、新全局说明结构、“合法填法 = 0”、详细核查保留以及原推理引用联动。
 
+### Pass 16 (`0.9.0`)
+
+- 在下一步固定操作栏中加入紧凑烧瓶入口，不压缩推理正文；进入后整条操作栏替换为单一“结束模拟推演”，确保已关闭的下一步推理不会继续占位或形成误导。
+- 模拟填块沿用蓝/灰状态语义，但增加半透明填充和白色虚线边缘；公开冲突使用红色双层静态轮廓，模拟剩余数为负时同步变红。
+- 顶部橙色文字持续说明“所有填块都不会揭示新信息”，手动区标题改为“模拟标记”，因此模式与冲突都不只依赖颜色表达。
+- 原生 Windows Qt 截图人工检查了侧栏高度、模式层级、多个冲突格、计数器和退出入口；100 项源码回归与冻结成品冒烟另行核对状态隔离、不释放提示、下一步关闭和真实盘面恢复。
+
 ## Implementation checklist
 
 - [x] Selected direction 2 reproduced as a functional two-column desktop UI.
@@ -169,7 +178,7 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Easy seed 1 dense-board capture passed visual inspection.
 - [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
 - [x] 0.7.3 onboarding and 0.7.4 white startup dropdown passed native Windows Qt visual inspection at their recorded logical sizes and device pixel ratios.
-- [x] Ninety automated core, cache, bridge, solver, session-store and Qt workflow tests pass.
+- [x] One hundred automated core, cache, bridge, solver, simulation, session-store and Qt workflow tests pass.
 - [x] Full-screen long-reason bottom capture and end-cursor visibility check pass.
 - [x] Hidden, blue and excluded buttons render black, orange and blue active outlines respectively.
 - [x] Original-style mouse controls persist, map real left/right clicks, toggle back to unknown, and restore manual tools when disabled.
@@ -179,6 +188,7 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Progress settings, save/load/clear actions and the restore-state badge remain legible on native Windows Qt.
 - [x] Confirmation dialogs remain light under the native Windows theme and use explicit Chinese outcomes.
 - [x] Global uniqueness reasons show the conclusion and trial-elimination summary before optional detailed coordinates.
+- [x] Simulation mode keeps next-step reasoning unavailable, distinguishes assumptions from real marks, highlights a sufficient public-conflict set, and restores the real board on exit.
 - [x] No actionable P0/P1/P2 visual findings remain.
 
 final result: passed

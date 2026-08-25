@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Optional
 
 import qtawesome as qta
 from PySide6.QtCore import QRegularExpression, QSize, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QAction, QFont, QKeySequence, QRegularExpressionValidator
+from PySide6.QtGui import QAction, QColor, QFont, QKeySequence, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -35,7 +35,8 @@ from .seed_workflow import Difficulty, SeedGeneratorRegistry, SeedRequest
 from .settings_dialog import SettingsDialog
 from .session import BoardStateError, InteractivePuzzleSession
 from .session_store import SESSION_FILE_SUFFIX, SessionStore, SessionStoreError, StoredSession
-from .solver import HexReasoningSolver, SolverCancelled
+from .simulation import SimulationSession
+from .solver import HexReasoningSolver, PublicConstraintConflict, SolverCancelled
 from .theme import COLORS, app_stylesheet
 from .widgets import ChamferPanel, HexCounterBadge, StateButton
 
@@ -120,6 +121,35 @@ class SolveStepThread(QThread):
         self.succeeded.emit(move, self.revision)
 
 
+class SimulationConflictThread(QThread):
+    succeeded = Signal(object, int)
+    failed = Signal(str, int)
+
+    def __init__(
+        self,
+        board: Board,
+        assumptions: dict[Coord, CellVisualType],
+        revision: int,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.board = board
+        self.assumptions = assumptions
+        self.revision = revision
+
+    def run(self) -> None:
+        try:
+            report = HexReasoningSolver(
+                self.isInterruptionRequested
+            ).find_public_conflict(self.board, self.assumptions)
+        except SolverCancelled:
+            return
+        except Exception as exc:
+            self.failed.emit(str(exc), self.revision)
+            return
+        self.succeeded.emit(report, self.revision)
+
+
 class BoardStage(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -131,6 +161,9 @@ class BoardStage(QWidget):
         layout.addWidget(self.board_view)
 
         self.mode_chip = QLabel("快速上手 · 尚未生成地图", self)
+        self.mode_text = self.mode_chip.text()
+        self.mode_verified = False
+        self.mode_simulation = False
         self.mode_chip.setStyleSheet(
             f"background: rgba(255,255,255,220); color: {COLORS['muted']}; "
             f"border: 1px solid {COLORS['border']}; border-radius: 4px; padding: 7px 11px;"
@@ -189,11 +222,26 @@ class BoardStage(QWidget):
         button.setAccessibleName(tooltip)
         return button
 
-    def set_mode(self, text: str, *, verified: bool = False) -> None:
+    def set_mode(
+        self,
+        text: str,
+        *,
+        verified: bool = False,
+        simulation: bool = False,
+    ) -> None:
+        self.mode_text = text
+        self.mode_verified = verified
+        self.mode_simulation = simulation
         self.mode_chip.setText(text)
+        accent = COLORS["orange"] if simulation else COLORS["blue"]
+        text_color = (
+            COLORS["orange_hover"]
+            if simulation
+            else COLORS["blue_hover"] if verified else COLORS["muted"]
+        )
         self.mode_chip.setStyleSheet(
-            f"background: rgba(255,255,255,225); color: {COLORS['blue_hover'] if verified else COLORS['muted']}; "
-            f"border: 1px solid {COLORS['blue'] if verified else COLORS['border']}; "
+            f"background: rgba(255,255,255,225); color: {text_color}; "
+            f"border: 1px solid {accent if simulation or verified else COLORS['border']}; "
             "border-radius: 4px; padding: 7px 11px; font-weight: 600;"
         )
         self.mode_chip.adjustSize()
@@ -251,6 +299,7 @@ class MainWindow(QMainWindow):
         self.preferences = preferences or AppPreferences()
         self.session_store = session_store or SessionStore()
         self.session = InteractivePuzzleSession(build_empty_board(), self.solver)
+        self.simulation_session: Optional[SimulationSession] = None
         self.current_move: Optional[SuggestedMove] = None
         self.current_seed: Optional[SeedRequest] = None
         self.selected_state = CellVisualType.HIDDEN
@@ -259,7 +308,11 @@ class MainWindow(QMainWindow):
         self._detector: Optional["HexImageDetector"] = None
         self._generation_thread: Optional[SeedGenerationThread] = None
         self._solve_thread: Optional[SolveStepThread] = None
+        self._simulation_conflict_thread: Optional[SimulationConflictThread] = None
         self._session_revision = 0
+        self._simulation_revision = 0
+        self._simulation_check_pending = False
+        self._simulation_origin_mode: Optional[tuple[str, bool]] = None
         self._solve_busy = False
         self._close_requested = False
         self._autosave_error_reported = False
@@ -295,6 +348,7 @@ class MainWindow(QMainWindow):
         self.stage.fit_button.clicked.connect(self.stage.board_view.fit_board)
         self.stage.import_button.clicked.connect(self.import_screenshot)
         self.stage.settings_button.clicked.connect(self.open_settings)
+        self.simulation_button.clicked.connect(self.toggle_simulation)
         self.undo_action = QAction("撤销", self)
         self.undo_action.setShortcut(QKeySequence.StandardKey.Undo)
         self.undo_action.triggered.connect(self.undo)
@@ -440,10 +494,10 @@ class MainWindow(QMainWindow):
         left_balance.setStyleSheet("background-color: transparent;")
         header.addWidget(left_balance)
         header.addStretch(1)
-        title = QLabel("手动标记")
-        title.setObjectName("SectionTitle")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header.addWidget(title)
+        self.manual_title = QLabel("手动标记")
+        self.manual_title.setObjectName("SectionTitle")
+        self.manual_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header.addWidget(self.manual_title)
         header.addStretch(1)
         self.manual_help_button = QPushButton()
         self.manual_help_button.setObjectName("GhostButton")
@@ -473,6 +527,7 @@ class MainWindow(QMainWindow):
                 button.setChecked(True)
         states.addStretch(1)
         layout.addLayout(states)
+
         return panel
 
     def _build_step_panel(self) -> QWidget:
@@ -543,6 +598,27 @@ class MainWindow(QMainWindow):
         self.apply_button.clicked.connect(self.apply_current_move)
         self.apply_button.setEnabled(False)
         actions.addWidget(self.apply_button)
+
+        self.simulation_button = QPushButton()
+        self.simulation_button.setObjectName("SimulationButton")
+        self.simulation_button.setIcon(
+            qta.icon("fa5s.flask", color=COLORS["orange_hover"])
+        )
+        self.simulation_button.setIconSize(QSize(16, 16))
+        self.simulation_button.setAccessibleName("开始模拟推演")
+        self.simulation_button.setAccessibleDescription(
+            "固定当前真实盘面，在不揭示新信息的隔离分支中尝试填块"
+        )
+        self.simulation_button.setToolTip("开始模拟推演")
+        self.simulation_button.setFixedSize(42, 38)
+        self.simulation_button.setStyleSheet(
+            f"QPushButton {{ color: {COLORS['orange_hover']}; "
+            f"background: {COLORS['orange_soft']}; border: 1px solid {COLORS['orange']}; "
+            "font-weight: 700; }} "
+            f"QPushButton:hover {{ background: {COLORS['white']}; }} "
+            "QPushButton:disabled { color: #B9A98D; background: #F3EEE5; border-color: #DDD2C0; }"
+        )
+        actions.addWidget(self.simulation_button)
         layout.addWidget(self.step_action_bar)
         return panel
 
@@ -583,17 +659,31 @@ class MainWindow(QMainWindow):
     def _select_state(self, state: CellVisualType) -> None:
         self.selected_state = state
 
+    def _active_board(self) -> Board:
+        if self.simulation_session is not None:
+            return self.simulation_session.board
+        return self.session.board
+
     def _apply_mouse_control_preference(self) -> None:
         enabled = self.preferences.original_mouse_controls_enabled
         board_interaction_enabled = self._has_active_board and not self._guide_visible
+        simulation = self.simulation_session is not None
         for button in self.state_buttons.values():
             button.setEnabled(board_interaction_enabled and not enabled)
             button.setToolTip(
-                "原版鼠标操作已开启：左键排除，右键蓝色"
+                "模拟推演：左键排除，右键蓝色；不会揭示新信息"
+                if enabled and simulation
+                else "原版鼠标操作已开启：左键排除，右键蓝色"
                 if enabled
+                else f"模拟标记为{button.label}；不会揭示新信息"
+                if simulation
                 else f"点击棋盘后设为{button.label}"
             )
-        if enabled:
+        if simulation and enabled:
+            help_text = "模拟推演：左键排除，右键蓝色；所有标记都不会揭示新信息"
+        elif simulation:
+            help_text = "模拟推演：选择状态后点击棋盘；所有标记都不会揭示新信息"
+        elif enabled:
             help_text = "原版鼠标操作已开启：左键排除，右键蓝色；再次同键点击恢复未知"
         else:
             help_text = "选择状态后，左键点击右侧棋盘同步游戏进度"
@@ -646,6 +736,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_board_interactions(self) -> None:
         enabled = self._has_active_board and not self._guide_visible
+        simulation = self.simulation_session is not None
         self.stage.board_view.setEnabled(enabled)
         for button in (
             self.stage.undo_button,
@@ -656,9 +747,28 @@ class MainWindow(QMainWindow):
             self.stage.fit_button,
         ):
             button.setEnabled(enabled)
-        self.next_button.setEnabled(enabled and not self._solve_busy)
+        self.next_button.setEnabled(enabled and not self._solve_busy and not simulation)
         self.apply_button.setEnabled(
-            enabled and not self._solve_busy and self.current_move is not None
+            enabled
+            and not self._solve_busy
+            and not simulation
+            and self.current_move is not None
+        )
+        self.step_action_bar.setVisible(True)
+        self.next_button.setVisible(not simulation)
+        self.apply_button.setVisible(not simulation)
+        generation_idle = self._generation_thread is None
+        for widget in (
+            self.seed_input,
+            self.easy_button,
+            self.hard_button,
+            self.copy_seed_button,
+            self.generate_button,
+        ):
+            widget.setEnabled(not simulation and generation_idle)
+        self.stage.settings_button.setEnabled(not simulation and generation_idle)
+        self.simulation_button.setEnabled(
+            enabled and not self._solve_busy and generation_idle
         )
         self.stage.counter_badge.setVisible(enabled)
         self._apply_mouse_control_preference()
@@ -668,6 +778,245 @@ class MainWindow(QMainWindow):
         if hasattr(self, "onboarding_overlay"):
             self.onboarding_overlay.setGeometry(self.root.rect())
             self._position_guide_close_button()
+
+    def toggle_simulation(self) -> None:
+        if self.simulation_session is None:
+            self.start_simulation()
+        else:
+            self.end_simulation()
+
+    def start_simulation(self) -> None:
+        if (
+            not self._has_active_board
+            or self._guide_visible
+            or self._generation_thread is not None
+            or self._solve_thread is not None
+        ):
+            return
+        if not self.session.board.hidden_cells():
+            self.stage.show_toast("当前盘面没有可用于模拟推演的未知格")
+            return
+        self._autosave_timer.stop()
+        self._save_autosave_now()
+        self.simulation_session = SimulationSession(self.session.board)
+        self._simulation_origin_mode = (
+            self.stage.mode_text,
+            self.stage.mode_verified,
+        )
+        self._simulation_revision += 1
+        self._simulation_check_pending = False
+        self.stage.board_view.set_board(self.simulation_session.board)
+        self.stage.board_view.set_simulation_state(True)
+        self.stage.set_mode(
+            "正在模拟推演 · 所有填块都不会揭示新信息",
+            simulation=True,
+        )
+        self._update_simulation_button(True)
+        self._set_simulation_status(checking=True)
+        self._update_counts()
+        self._refresh_board_interactions()
+        self._schedule_simulation_conflict_check()
+        self.stage.show_toast("已固定当前盘面；模拟标记不会写入真实局面")
+
+    def end_simulation(self, *, show_toast: bool = True) -> None:
+        if self.simulation_session is None:
+            return
+        if (
+            self._simulation_conflict_thread is not None
+            and self._simulation_conflict_thread.isRunning()
+        ):
+            self._simulation_conflict_thread.requestInterruption()
+        self.simulation_session = None
+        self._simulation_revision += 1
+        self._simulation_check_pending = False
+        mode_text, verified = self._simulation_origin_mode or ("当前局面", True)
+        self._simulation_origin_mode = None
+        self.stage.board_view.set_board(self.session.board)
+        self.stage.board_view.set_simulation_state(False)
+        self.stage.set_mode(mode_text, verified=verified)
+        self._update_simulation_button(False)
+        self.stage.board_view.set_target(self.current_move)
+        self._update_step_card(self.current_move)
+        self._update_counts()
+        self._refresh_board_interactions()
+        if show_toast:
+            self.stage.show_toast("已丢弃模拟分支并返回推演开始时的真实局面")
+
+    def _update_simulation_button(self, active: bool) -> None:
+        self.manual_title.setText("模拟标记" if active else "手动标记")
+        self.step_panel.border = QColor(COLORS["orange"] if active else COLORS["blue"])
+        self.step_panel.update()
+        control_labels = (
+            ("撤销模拟修改", "重做模拟修改", "重置本次模拟推演")
+            if active
+            else ("撤销", "重做", "恢复初始盘面")
+        )
+        for button, label in zip(
+            (
+                self.stage.undo_button,
+                self.stage.redo_button,
+                self.stage.reset_button,
+            ),
+            control_labels,
+        ):
+            button.setToolTip(label)
+            button.setAccessibleName(label)
+        if active:
+            self.simulation_button.setText("结束模拟推演")
+            self.simulation_button.setIcon(
+                qta.icon("fa5s.sign-out-alt", color=COLORS["white"])
+            )
+            self.simulation_button.setAccessibleName("结束模拟推演")
+            self.simulation_button.setAccessibleDescription(
+                "丢弃全部模拟标记并返回推演开始时的真实局面"
+            )
+            self.simulation_button.setToolTip("")
+            self.simulation_button.setMinimumWidth(0)
+            self.simulation_button.setMaximumWidth(16_777_215)
+            self.simulation_button.setFixedHeight(38)
+            self.simulation_button.setSizePolicy(
+                QSizePolicy.Policy.Expanding,
+                QSizePolicy.Policy.Fixed,
+            )
+            self.simulation_button.setStyleSheet(
+                self._primary_button_style(
+                    COLORS["orange"], COLORS["orange_hover"], 34, 13
+                )
+            )
+            return
+        self.simulation_button.setText("开始模拟推演")
+        self.simulation_button.setIcon(
+            qta.icon("fa5s.flask", color=COLORS["orange_hover"])
+        )
+        self.simulation_button.setAccessibleName("开始模拟推演")
+        self.simulation_button.setAccessibleDescription(
+            "固定当前真实盘面，在不揭示新信息的隔离分支中尝试填块"
+        )
+        self.simulation_button.setToolTip("开始模拟推演")
+        self.simulation_button.setSizePolicy(
+            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Fixed,
+        )
+        self.simulation_button.setFixedSize(42, 38)
+        self.simulation_button.setStyleSheet(
+            f"QPushButton {{ color: {COLORS['orange_hover']}; "
+            f"background: {COLORS['orange_soft']}; border: 1px solid {COLORS['orange']}; "
+            "font-weight: 700; }} "
+            f"QPushButton:hover {{ background: {COLORS['white']}; }} "
+            "QPushButton:disabled { color: #B9A98D; background: #F3EEE5; border-color: #DDD2C0; }"
+        )
+
+    def _simulation_changed(self) -> None:
+        simulation = self.simulation_session
+        if simulation is None:
+            return
+        self._simulation_revision += 1
+        self.stage.board_view.set_simulation_state(
+            True,
+            changed_coords=simulation.changed_coords,
+        )
+        self._update_counts()
+        self._set_simulation_status(checking=True)
+        self._schedule_simulation_conflict_check()
+
+    def _schedule_simulation_conflict_check(self) -> None:
+        if self.simulation_session is None:
+            return
+        thread = self._simulation_conflict_thread
+        if thread is not None and thread.isRunning():
+            self._simulation_check_pending = True
+            thread.requestInterruption()
+            return
+        self._simulation_check_pending = False
+        simulation = self.simulation_session
+        thread = SimulationConflictThread(
+            deepcopy(simulation.initial_board),
+            dict(simulation.assumed_states()),
+            self._simulation_revision,
+            self,
+        )
+        self._simulation_conflict_thread = thread
+        thread.succeeded.connect(self._simulation_conflict_succeeded)
+        thread.failed.connect(self._simulation_conflict_failed)
+        thread.finished.connect(self._simulation_conflict_finished)
+        thread.start()
+
+    def _simulation_conflict_succeeded(self, report: object, revision: int) -> None:
+        if self.simulation_session is None or revision != self._simulation_revision:
+            return
+        if report is not None and not isinstance(report, PublicConstraintConflict):
+            self._simulation_conflict_failed("矛盾检查返回了无法识别的结果", revision)
+            return
+        self._set_simulation_status(report=report)
+
+    def _simulation_conflict_failed(self, message: str, revision: int) -> None:
+        if self.simulation_session is None or revision != self._simulation_revision:
+            return
+        self.stage.board_view.set_simulation_conflict(())
+        self.step_title.setText("模拟推演")
+        self.step_coord.setText("检查失败")
+        self._set_step_reason(
+            "矛盾检查没有得到确定结果，当前模拟填块不会被当作正确或错误。\n\n"
+            f"原因：{message}"
+        )
+
+    def _simulation_conflict_finished(self) -> None:
+        thread = self._simulation_conflict_thread
+        self._simulation_conflict_thread = None
+        if thread is not None:
+            thread.deleteLater()
+        if self.simulation_session is not None and self._simulation_check_pending:
+            self._simulation_check_pending = False
+            QTimer.singleShot(0, self._schedule_simulation_conflict_check)
+        if self._close_requested:
+            QTimer.singleShot(0, self.close)
+
+    def _set_simulation_status(
+        self,
+        report: Optional[PublicConstraintConflict] = None,
+        *,
+        checking: bool = False,
+    ) -> None:
+        if self.simulation_session is None:
+            return
+        if checking:
+            self.stage.board_view.set_simulation_conflict(())
+            self.step_title.setText("模拟推演")
+            self.step_coord.setText("检查中…")
+            self._set_step_reason(
+                "下一步推理已关闭。你可以手动尝试排除格或蓝格；"
+                "应用只会检查这些假设是否与当前公开线索矛盾。"
+            )
+            return
+        if report is None:
+            self.stage.board_view.set_simulation_conflict(())
+            self.step_title.setText("模拟推演")
+            self.step_coord.setText("暂无矛盾")
+            self._set_step_reason(
+                "当前模拟填块仍能满足已公开的条件。\n\n"
+                "这只表示暂未发现矛盾，不代表这些填块已经被证明正确。"
+            )
+            return
+        self.stage.board_view.set_simulation_conflict(report.assumption_coords)
+        if report.base_board_inconsistent:
+            self.step_title.setText("起始盘面有矛盾")
+            self.step_coord.setText("检查真实局面")
+            heading = "进入推演前的公开盘面已经无法满足全部公开条件。"
+        else:
+            self.step_title.setText("发现模拟矛盾")
+            self.step_coord.setText(f"{len(report.assumption_coords)} 个填块")
+            coords = "、".join(str(coord) for coord in report.assumption_coords)
+            heading = f"以下模拟填块共同导致公开条件无解：{coords}。"
+        labels = list(report.constraint_labels)
+        shown = labels[:6]
+        constraints = "\n".join(f"- {label}" for label in shown)
+        if len(labels) > len(shown):
+            constraints += f"\n- 另有 {len(labels) - len(shown)} 条相关条件"
+        self._set_step_reason(
+            f"{heading}\n\n相关公开条件：\n{constraints}\n\n"
+            "提示：高亮的是一组足以造成矛盾的假设。这不代表其中每一格都错；"
+            "除非公开条件能单独证明，不能断言某一格就是实际错格。"
+        )
 
     def _on_cell_activated(
         self,
@@ -681,7 +1030,7 @@ class MainWindow(QMainWindow):
                 requested_state = CellVisualType.BLUE
             else:
                 return
-            cell = self.session.board.get_cell(coord)
+            cell = self._active_board().get_cell(coord)
             if cell is not None and cell.visual_type is requested_state:
                 requested_state = CellVisualType.HIDDEN
         else:
@@ -690,11 +1039,18 @@ class MainWindow(QMainWindow):
             requested_state = self.selected_state
         self.stage.board_view.set_selected(coord)
         try:
-            change = self.session.set_cell_state(coord, requested_state)
+            if self.simulation_session is not None:
+                change = self.simulation_session.set_cell_state(coord, requested_state)
+            else:
+                change = self.session.set_cell_state(coord, requested_state)
         except BoardStateError as exc:
             self.stage.show_toast(str(exc), danger=True)
             return
         if change.before is change.after:
+            return
+        if self.simulation_session is not None:
+            self.stage.board_view.sync_state()
+            self._simulation_changed()
             return
         self._session_changed()
         self.current_move = None
@@ -704,7 +1060,11 @@ class MainWindow(QMainWindow):
         self._update_step_card(None)
 
     def solve_next_step(self) -> None:
-        if self._solve_thread is not None or not self._has_active_board:
+        if (
+            self.simulation_session is not None
+            or self._solve_thread is not None
+            or not self._has_active_board
+        ):
             return
         revision = self._session_revision
         thread = SolveStepThread(deepcopy(self.session.board), revision, self)
@@ -758,7 +1118,7 @@ class MainWindow(QMainWindow):
         self._refresh_board_interactions()
 
     def apply_current_move(self) -> None:
-        if self.current_move is None:
+        if self.simulation_session is not None or self.current_move is None:
             return
         move = self.current_move
         try:
@@ -774,6 +1134,14 @@ class MainWindow(QMainWindow):
         self._update_step_card(None)
 
     def undo(self) -> None:
+        if self.simulation_session is not None:
+            change = self.simulation_session.undo()
+            if change is None:
+                self.stage.show_toast("没有可以撤销的模拟修改")
+                return
+            self.stage.board_view.sync_state()
+            self._simulation_changed()
+            return
         change = self.session.undo()
         if change is None:
             self.stage.show_toast("没有可以撤销的手动修改")
@@ -786,6 +1154,14 @@ class MainWindow(QMainWindow):
         self._update_step_card(None)
 
     def redo(self) -> None:
+        if self.simulation_session is not None:
+            change = self.simulation_session.redo()
+            if change is None:
+                self.stage.show_toast("没有可以重做的模拟修改")
+                return
+            self.stage.board_view.sync_state()
+            self._simulation_changed()
+            return
         change = self.session.redo()
         if change is None:
             self.stage.show_toast("没有可以重做的修改")
@@ -798,6 +1174,12 @@ class MainWindow(QMainWindow):
         self._update_step_card(None)
 
     def reset_board(self) -> None:
+        if self.simulation_session is not None:
+            self.simulation_session.reset()
+            self.stage.board_view.set_board(self.simulation_session.board)
+            self._simulation_changed()
+            self.stage.show_toast("已重置到本次模拟推演的起始局面")
+            return
         self.session.reset()
         self._session_changed()
         self.current_move = None
@@ -807,6 +1189,9 @@ class MainWindow(QMainWindow):
         self.stage.show_toast("已恢复到初始盘面")
 
     def generate_seed_board(self) -> None:
+        if self.simulation_session is not None:
+            self.stage.show_toast("请先结束模拟推演，再生成新的地图")
+            return
         if self._generation_thread is not None:
             return
         difficulty = Difficulty.EASY if self.easy_button.isChecked() else Difficulty.HARD
@@ -926,6 +1311,9 @@ class MainWindow(QMainWindow):
         self._save_autosave_now()
 
     def open_settings(self) -> None:
+        if self.simulation_session is not None:
+            self.stage.show_toast("请先结束模拟推演，再打开设置")
+            return
         dialog = SettingsDialog(
             self.seed_generators.cache,
             self.preferences,
@@ -945,6 +1333,9 @@ class MainWindow(QMainWindow):
             self.clear_current_progress()
 
     def save_progress_as(self) -> None:
+        if self.simulation_session is not None:
+            self.stage.show_toast("模拟分支不会保存；请先结束推演")
+            return
         if not self._has_active_board:
             self.stage.show_toast("当前没有可保存的局面", danger=True)
             return
@@ -978,6 +1369,9 @@ class MainWindow(QMainWindow):
         self.stage.show_toast(f"局面已保存：{Path(path).name}")
 
     def load_progress_from_file(self) -> None:
+        if self.simulation_session is not None:
+            self.stage.show_toast("请先结束模拟推演，再载入其他局面")
+            return
         path, _ = QFileDialog.getOpenFileName(
             self,
             "载入局面",
@@ -995,6 +1389,9 @@ class MainWindow(QMainWindow):
         self._save_autosave_now()
 
     def clear_current_progress(self) -> None:
+        if self.simulation_session is not None:
+            self.stage.show_toast("请先结束模拟推演，再清除进度")
+            return
         confirmed = ask_confirmation(
             self,
             title="清除当前进度",
@@ -1106,11 +1503,11 @@ class MainWindow(QMainWindow):
             self._schedule_autosave()
 
     def _schedule_autosave(self) -> None:
-        if self._has_active_board:
+        if self._has_active_board and self.simulation_session is None:
             self._autosave_timer.start(250)
 
     def _save_autosave_now(self) -> None:
-        if not self._has_active_board:
+        if not self._has_active_board or self.simulation_session is not None:
             return
         try:
             self.session_store.save_autosave(
@@ -1148,7 +1545,7 @@ class MainWindow(QMainWindow):
         self.apply_button.setEnabled(self._has_active_board and not self._guide_visible)
 
     def _set_step_reason(self, text: str) -> None:
-        self.step_reason.set_reason(text, self.session.board)
+        self.step_reason.set_reason(text, self._active_board())
         document = self.step_reason.document()
         root_frame = document.rootFrame()
         frame_format = root_frame.frameFormat()
@@ -1164,11 +1561,14 @@ class MainWindow(QMainWindow):
         self.stage.board_view.set_reason_reference(reference, pinned=pinned)
 
     def _update_counts(self) -> None:
-        board = self.session.board
+        board = self._active_board()
         remaining = board.remaining_blue
         if remaining is None:
             remaining = len(board.hidden_cells())
-        self.stage.counter_badge.set_value(remaining)
+        self.stage.counter_badge.set_value(
+            remaining,
+            caption="模拟剩余" if self.simulation_session is not None else "剩余",
+        )
 
     def closeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         if self._generation_thread is not None and self._generation_thread.isRunning():
@@ -1181,6 +1581,17 @@ class MainWindow(QMainWindow):
             self.stage.show_toast("正在安全结束本次推理，完成后会自动关闭…")
             event.ignore()
             return
+        if (
+            self._simulation_conflict_thread is not None
+            and self._simulation_conflict_thread.isRunning()
+        ):
+            self._close_requested = True
+            self._simulation_conflict_thread.requestInterruption()
+            self.stage.show_toast("正在安全结束模拟矛盾检查，完成后会自动关闭…")
+            event.ignore()
+            return
+        if self.simulation_session is not None:
+            self.end_simulation(show_toast=False)
         self._autosave_timer.stop()
         self._save_autosave_now()
         super().closeEvent(event)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 import traceback
 from pathlib import Path
 
@@ -42,6 +43,28 @@ def _write_progress(message: str) -> None:
         return
     with Path(log_path).open("a", encoding="utf-8") as stream:
         stream.write(message + "\n")
+
+
+def _wait_for_simulation_check(
+    window: MainWindow,
+    app: QApplication,
+    timeout_seconds: float = 10.0,
+) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    stable_idle_cycles = 0
+    while time.monotonic() < deadline:
+        app.processEvents()
+        if (
+            window._simulation_conflict_thread is None
+            and not window._simulation_check_pending
+        ):
+            stable_idle_cycles += 1
+            if stable_idle_cycles >= 2:
+                return
+        else:
+            stable_idle_cycles = 0
+        time.sleep(0.01)
+    raise RuntimeError("模拟矛盾检查没有在成品冒烟时结束。")
 
 
 def _verify_packaged_resources() -> None:
@@ -481,6 +504,57 @@ def run_package_smoke_test() -> int:
         ):
             raise RuntimeError("打包界面没有保持所有行线索可见。")
         _verify_reason_interactions(window, app)
+
+        simulation_coord = window.session.board.hidden_cells()[0].coord
+        real_before = window.session.board.get_cell(simulation_coord).visual_type
+        window.start_simulation()
+        _wait_for_simulation_check(window, app)
+        if (
+            window.simulation_session is None
+            or window.next_button.isEnabled()
+            or window.apply_button.isEnabled()
+            or not window.next_button.isHidden()
+            or not window.apply_button.isHidden()
+        ):
+            raise RuntimeError("成品没有在模拟推演期间彻底关闭下一步推理。")
+        window.simulation_session.set_cell_state(
+            simulation_coord,
+            CellVisualType.BLACK,
+        )
+        window._simulation_changed()
+        _wait_for_simulation_check(window, app)
+        simulated = window.simulation_session.board.get_cell(simulation_coord)
+        if (
+            simulated.visual_type is not CellVisualType.BLACK
+            or simulated.clue_text
+            or window.session.board.get_cell(simulation_coord).visual_type is not real_before
+        ):
+            raise RuntimeError("模拟填块泄露了提示或修改了真实局面。")
+        window.reset_board()
+        _wait_for_simulation_check(window, app)
+        simulation = window.simulation_session
+        assert simulation is not None
+        remaining = simulation.initial_board.remaining_blue
+        if remaining is None:
+            raise RuntimeError("成品模拟盘面缺少剩余蓝格数。")
+        for cell in simulation.board.hidden_cells()[: remaining + 1]:
+            simulation.set_cell_state(cell.coord, CellVisualType.BLUE)
+        window._simulation_changed()
+        _wait_for_simulation_check(window, app)
+        if (
+            not window.stage.board_view.simulation_conflict_coords
+            or window.step_title.text() != "发现模拟矛盾"
+        ):
+            raise RuntimeError("成品没有定位公开约束下的模拟矛盾填块。")
+        window.end_simulation()
+        _wait_for_simulation_check(window, app)
+        if (
+            window.simulation_session is not None
+            or window.session.board.get_cell(simulation_coord).visual_type is not real_before
+            or window.next_button.isHidden()
+            or window.apply_button.isHidden()
+        ):
+            raise RuntimeError("成品没有完整丢弃模拟分支并恢复真实局面。")
 
         settings = SettingsDialog(
             registry.cache,

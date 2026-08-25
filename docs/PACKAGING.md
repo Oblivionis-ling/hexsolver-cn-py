@@ -2,16 +2,16 @@
 
 ## 目标
 
-`0.8.2` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享版本化种子缓存与局面存档实现。本版保留 0.8.1 的浅色确认框和渐进式全局说明，通过合法解见证、同局面模型复用和短时最大差异合法解减少 CP-SAT 重复工作；地图生成、规则、步骤顺序、解释和推理结论保持不变。
+`0.9.0` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享版本化种子缓存与局面存档实现。本版新增只使用公开条件的 `SimulationSession`：推演期间不揭示新信息、关闭下一步推理，公开约束矛盾在后台检测，退出时丢弃模拟分支；地图生成、正常求解步骤、解释和真实局面保存逻辑保持不变。
 
 发布资产：
 
 ```text
-HexInfiniteSolver-0.8.2-windows-x64.exe
-HexInfiniteSolver-0.8.2-windows-x64.exe.sha256
+HexInfiniteSolver-0.9.0-windows-x64.exe
+HexInfiniteSolver-0.9.0-windows-x64.exe.sha256
 ```
 
-最终冻结成品为 96,551,060 字节（92.08 MiB），FileVersion/ProductVersion 均为 `0.8.2`，SHA-256 为 `a98834dd256bf87d121ebb7059df9fcffa414c2e0a49cc18448289d71151fdd6`。
+最终冻结成品为 96,567,151 字节（92.09 MiB），FileVersion/ProductVersion 均为 `0.9.0`，SHA-256 为 `626f6fe66b5d12210d4e8c7073d9ebe952a460f67c9b96f7de5bb40aba28cfef`。
 
 ## 成品包含什么
 
@@ -20,9 +20,9 @@ HexInfiniteSolver-0.8.2-windows-x64.exe.sha256
 - Hard 纯 Python 生成器。
 - 项目自有的 `HexcellsHeadless.exe`、`UnityEngine.dll` 和 `TextMeshPro-5.6-Runtime.dll` 最小兼容宿主。
 - Qt 插件、字体图标、应用图标和 Windows 版本资源。
-- 种子缓存、局面存档、用户体验偏好与设置页；运行时用户数据不会预置在 EXE 中。
+- 种子缓存、局面存档、用户体验偏好、设置页和隔离模拟推演；运行时用户数据不会预置在 EXE 中。
 
-截图入口当前关闭，因此 0.8.2 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI 或种子求解流程。
+截图入口当前关闭，因此 0.9.0 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI、种子求解或模拟推演流程。
 
 ## 成品不包含什么
 
@@ -71,6 +71,8 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 - 核对局面自动恢复开关、保存/载入/清除入口、重做按钮，以及存档写入后恢复种子与格子状态；
 - 核对恢复、清除进度和删除缓存的浅色确认框不继承系统深色表面，且使用明确的中文操作按钮；
 - 核对全局唯一性理由包含结论、试填反证、合法填法计数、关键条件、详细核查与术语说明；
+- 进入模拟推演后核对下一步推理和应用建议完全隐藏、顶部模式提示存在、起始公开状态被锁定，且模拟蓝格不释放私有提示；
+- 构造只在多个模拟填块共同存在时才无解的公开约束，核对红色双层冲突轮廓、负数模拟剩余提示和充分冲突集合语义；随后结束推演并确认真实盘面完整恢复；
 - 真实展开启动窗口下拉菜单，核对折叠态、白底深色文字调色板、白底实际像素比例、无深色大块和选择后收起行为；
 - 持久化切换启动窗口模式，重新打开说明，并在装载真实 Hard seed 1 后确认说明自动收起、棋盘操作恢复；
 - 核对单文件内的三个 Easy 托管宿主文件；

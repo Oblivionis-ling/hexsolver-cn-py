@@ -24,14 +24,14 @@ F:\SteamLibrary\steamapps\common\Hexcells Infinite
 - Python 应用、Hard 纯 Python 生成器和 Easy 无 Unity 托管宿主源码；
 - 一键启动、依赖、诊断和测试；
 - `tests/fixtures/` 中两个小型结构化 TSV 回归夹具；
-- `docs/images/` 中两张生成结果证据，以及 `docs/design/` 中当前启动说明、白底下拉选择器、浅色确认框和易读全局理由界面证据；
+- `docs/images/` 中两张生成结果证据，以及 `docs/design/` 中当前启动说明、白底下拉选择器、浅色确认框、易读全局理由和模拟推演界面证据；
 - 开发历史、算法、路线、设计验收和研究资料。
 
 以下内容有用但只保留在本地，并由 `.gitignore` 排除：
 
 - `.conda_env/`：当前一键启动环境，可由 `run.ps1` 重建；
 - `managed_core/bin/`：Easy 托管核心构建产物，可由 `managed_core/build.ps1` 重建；
-- `dist/`：只保留最新 0.8.2 单文件成品与 SHA-256；
+- `dist/`：当前最新成品为 0.9.0 单文件 EXE 与 SHA-256；旧版仅作为本地历史产物暂存，不进入源码提交；
 - `build/`：PyInstaller 中间目录，发布验证后删除，需要时可由 `packaging/build_app.ps1` 重建；
 - `tests/images/`、`tests/labels/`：含原版游戏截图的 OCR 本地数据；
 - `tests/reports/`：临时视觉 QA 输出；
@@ -140,6 +140,14 @@ Easy 托管核心的真实集成校验仍需要合法安装中的 `Assembly-CSha
 - 单线程在代表夹具和用户现场局面上都快于多线程，因而不增加高资源开关；空闲预计算也没有进入产品。
 - 0.9.0 的视觉原型盘面准确性仍待评审，本次没有修改或继续实现这些方案。
 - 源码、版本资源与发布文件名统一为 `0.8.2`；地图生成、规则、步骤顺序、解释、缓存格式和私有答案隔离不变。
+
+## 2026-08-25 0.9.0 更新
+
+- 新增 `SimulationSession` 隔离模拟分支，只允许修改进入推演时仍未知的格子；模拟标记不会释放覆盖层提示，也不会进入真实自动存档或正常撤销记录。
+- `HexReasoningSolver.find_public_conflict()` 只用公开盘面和模拟 assumptions 检查矛盾，返回一组充分冲突填块；超时不会误报，未发现矛盾也不代表假设正确。
+- 推演期间关闭下一步推理和应用建议，使用独立撤销、重做、重置和单一退出入口；设置、生成及局面存取在推演期间被阻止。
+- `docs/design/` 增加原生 Windows Qt 模拟冲突画面；100 项源码回归与冻结成品 UI + Easy/Hard seed 1 冒烟均通过。
+- 源码、版本资源和成品文件名统一为 `0.9.0`。当前本地成品为 96,567,151 字节（92.09 MiB），SHA-256 为 `626f6fe66b5d12210d4e8c7073d9ebe952a460f67c9b96f7de5bb40aba28cfef`。
 
 ## 清理原则
 

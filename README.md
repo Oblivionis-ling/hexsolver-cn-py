@@ -1,17 +1,17 @@
 # HexInfinite 种子求解器
 
-当前版本：`0.8.2`
+当前版本：`0.9.0`
 
 这是一个面向 `Hexcells Infinite` 的 Windows 中文逐步求解器。输入种子号并选择 Easy/Hard 后，程序会在本地复刻原版地图，不再启动 `Hexcells Infinite.exe`；你可以手动同步当前进度，然后每次只获取一个必然步骤和中文理由。
 
 ## 下载 Windows 单文件版
 
-从 [GitHub Release v0.8.2](https://github.com/Oblivionis-ling/hexsolver-cn-py/releases/tag/v0.8.2) 下载：
+从 [GitHub Release v0.9.0](https://github.com/Oblivionis-ling/hexsolver-cn-py/releases/tag/v0.9.0) 下载：
 
-- `HexInfiniteSolver-0.8.2-windows-x64.exe`
-- `HexInfiniteSolver-0.8.2-windows-x64.exe.sha256`
+- `HexInfiniteSolver-0.9.0-windows-x64.exe`
+- `HexInfiniteSolver-0.9.0-windows-x64.exe.sha256`
 
-无需安装 Python、Conda 或项目依赖，下载后直接双击 EXE。`0.8.2` 保留 0.8.1 的浅色确认框和易读全局说明，并通过见证解、同局面模型复用和短时最大差异合法解显著减少全局唯一性检查；地图生成、规则、步骤顺序、解释和推理结论保持不变。
+无需安装 Python、Conda 或项目依赖，下载后直接双击 EXE。`0.9.0` 新增隔离的模拟推演：固定当前真实盘面后，可以在不揭示新信息的分支中试填蓝格或排除格，并只根据公开线索检查矛盾；退出推演即可完整返回起始局面。推演期间完全关闭下一步推理和应用建议，也不会污染真实撤销记录、自动存档或当前进度。
 
 系统要求：Windows 10/11 x64。Hard 完全离线可用；Easy 仍需要本机合法安装 Steam 版 `Hexcells Infinite`，程序只读其 `Assembly-CSharp.dll` 并校验版本，不会把原游戏 DLL、EXE 或存档打进安装包。由于当前成品未做商业代码签名，Windows 首次下载时可能显示 SmartScreen 提示；请用 Release 同时提供的 SHA-256 文件核对完整性。
 
@@ -22,6 +22,8 @@
 ![0.8.1 浅色中文确认框](docs/design/ui-light-confirmation.png)
 
 ![0.8.1 更易读的全局唯一性说明](docs/design/ui-readable-global-reason.png)
+
+![0.9.0 模拟推演与公开约束冲突高亮](docs/design/ui-v090-simulation-conflict.png)
 
 ## 已可用
 
@@ -40,6 +42,10 @@
 - 一次只高亮一个必然步骤，并显示可滚动、可核查的中文推理过程。
 - 全局唯一性理由先给出结论和试填反证摘要，再提供关键条件、完整坐标核查与术语说明；第一次阅读可以跳过详细核查。
 - 全局唯一性检查复用同一盘面的 CP-SAT 模型，只验证基础合法解的相反值，并用第二份合法解批量排除非固定格；代表 Hard 完整回放约快 10.8 倍，超时会安全回退。
+- 当前真实盘面可一键进入模拟推演；进入时已有状态全部锁定，只有当时的未知格可以添加模拟蓝格或排除标记。
+- 模拟标记使用半透明填充和虚线轮廓，不释放格内提示、不读取私有答案；推演期间“计算下一步”和应用建议完全关闭。
+- 每次模拟修改后只用进入时已经公开的格内提示、行线索和剩余数检查可行性；若假设共同造成矛盾，会用红色双层轮廓高亮一组足以冲突的模拟填块。该集合不表示其中某个单格已被证明是实际错格，未发现矛盾也不表示假设已经被证明正确。
+- 模拟推演拥有独立的撤销、重做和重置；结束后丢弃整个模拟分支，真实盘面、正常撤销记录和自动存档保持不变。
 - 恢复局面、清除进度和删除缓存均使用不受系统深色主题影响的浅色确认框，按钮直接说明操作结果。
 - 应用当前建议的勾选按钮不再弹出悬停说明；功能保持为直接把当前必然步应用到本地盘面，并保留无障碍名称。
 - 推理中的单个坐标、完整坐标数组和“横向 / 左下斜 / 右下斜”行引用可与棋盘联动；悬停不弹提示框，使用外层轻柔光与内层细虚线做一次性淡入预览，点击固定后改为静态实线、文字加粗，数组成员会作为一个整体同时高亮。
@@ -73,13 +79,13 @@ Easy 托管程序集固定检查以下基线：
 D:\Desktop\HexInfinite\reverse_harness\game
 ```
 
-当前验证结果：Easy/Hard seed 1–50 的最终 TSV 均逐字段一致，并额外通过 `00000000`、`99999999` 两个边界种子；Hard 样本覆盖五种地图形状。`0.4.1` 修正棋盘上下镜像，`0.4.2` 同步修正左右斜向标签，`0.4.3` 加入详细可核查推理；`0.5.0` 至 `0.7.1` 逐步完善封装、显示、缓存、输入和推理联动；`0.7.2` 优化推理层级调度；`0.7.3–0.7.4` 调整启动、设置和新手引导体验；`0.8.0` 增加后台推理、局面存取及完整撤销/重做；`0.8.1` 改善确认框和全局理由的表达与排版；`0.8.2` 在不改变结论的前提下优化全局求解性能。seed 1/2 已与现有官方截图逐个核对轮廓和线索方位。`reverse_harness` 中的原版运行时桥只保留为显式差分校验工具，不在默认产品链路中。
+当前验证结果：Easy/Hard seed 1–50 的最终 TSV 均逐字段一致，并额外通过 `00000000`、`99999999` 两个边界种子；Hard 样本覆盖五种地图形状。`0.4.1` 修正棋盘上下镜像，`0.4.2` 同步修正左右斜向标签，`0.4.3` 加入详细可核查推理；`0.5.0` 至 `0.7.1` 逐步完善封装、显示、缓存、输入和推理联动；`0.7.2` 优化推理层级调度；`0.7.3–0.7.4` 调整启动、设置和新手引导体验；`0.8.0` 增加后台推理、局面存取及完整撤销/重做；`0.8.1` 改善确认框和全局理由的表达与排版；`0.8.2` 在不改变结论的前提下优化全局求解性能；`0.9.0` 新增只依赖公开条件、不会揭示新信息的隔离模拟推演。seed 1/2 已与现有官方截图逐个核对轮廓和线索方位。`reverse_harness` 中的原版运行时桥只保留为显式差分校验工具，不在默认产品链路中。
 
 性能边界：Easy 通常不到 1 秒；Hard 会忠实重放原版的多轮可解性验证与冗余线索裁剪，小图约数秒，少数复杂种子可能需要几十秒。首次生成始终在 UI 后台线程中执行；成功结果会自动缓存，相同 Build、后端、难度和种子的后续加载通常只需读取本地 JSON。
 
 ## 启动
 
-普通用户优先使用 Release 中的 `HexInfiniteSolver-0.8.2-windows-x64.exe`，直接双击即可。
+普通用户优先使用 Release 中的 `HexInfiniteSolver-0.9.0-windows-x64.exe`，直接双击即可。
 
 以下方式用于源码开发：
 
@@ -114,6 +120,8 @@ conda run -n hexsolver-cn python main.py
 4. 默认可选择“未知 / 蓝色 / 排除”后左键点击棋盘；也可在设置中开启原版式操作，直接左键排除、右键标记蓝色。
 5. 点击“计算下一步”。
 6. 查看高亮目标、动作和中文理由；把鼠标移到理由中的坐标、坐标数组或行名称上可预览对应棋盘元素，点击可固定/取消联动。右侧勾选按钮可把建议应用到本地盘面。
+
+需要试验假设时，点击下一步操作栏中的烧瓶入口进入模拟推演。推演会锁定当前真实盘面；使用蓝格或排除工具标记原本未知的格子，程序会在后台按公开线索检查矛盾。红色双层轮廓表示这一组模拟填块共同构成了一组充分冲突条件，不等于其中每个格都被单独证明错误。推演期间没有下一步推理；可使用独立撤销、重做和重置，完成后点击“结束模拟推演”丢弃所有假设并返回真实盘面。
 
 首次启动先按手绘说明输入种子并生成地图；生成成功后说明自动收起。原版式操作下，对同一格再次使用相同按键会恢复未知。中键拖动棋盘，滚轮缩放。右下角可撤销、重做、重置、缩放、适合窗口并打开设置；`Ctrl+Z` 撤销、`Ctrl+Y` 重做。自动存档默认位于 `%LOCALAPPDATA%\HexInfiniteSolver\sessions\autosave.hexsave`，种子缓存位于 `%LOCALAPPDATA%\HexInfiniteSolver\seed-cache\v1`。截图按钮当前为禁用状态；当前请使用种子生成地图并手动同步游戏进度。
 
@@ -159,7 +167,7 @@ conda run -n hexsolver-cn python main.py
 .\test.ps1
 ```
 
-构建并验证 0.8.2 单文件成品：
+构建并验证 0.9.0 单文件成品：
 
 ```powershell
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\build_app.ps1
@@ -167,7 +175,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 
 构建脚本会执行源码测试、构建 Easy 托管核心、生成单文件 EXE、检查归档不含原游戏程序集，并启动真实成品完成 UI + Easy/Hard seed 1 冒烟测试。详细边界见 [Windows 打包与发布](docs/PACKAGING.md)。
 
-当前 90 项自动测试覆盖原有生成、求解和 UI 回归，并包含撤销/重做、存档门禁、后台推理、浅色确认框、新版全局理由结构、单模型复用、相反值检查、差异见证和超时安全回退。Easy/Hard seed 1–50 及两个八位边界种子已做原版逐字段差分；代表种子还会完整解到零未知格并逐步核对私有答案。
+当前 100 项自动测试覆盖原有生成、求解和 UI 回归，并包含撤销/重做、存档门禁、后台推理、浅色确认框、新版全局理由结构、单模型复用、相反值检查、差异见证和超时安全回退。新增回归验证模拟状态隔离、起始格锁定、不揭示私有提示、独立撤销/重做/重置、多人为假设共同冲突、后台结果过期保护以及 UI 中下一步推理关闭和真实盘面恢复。Easy/Hard seed 1–50 及两个八位边界种子已做原版逐字段差分；代表种子还会完整解到零未知格并逐步核对私有答案。
 
 复现 0.8.2 性能对照：
 
@@ -195,12 +203,11 @@ public board + private answer
         |
         v
 InteractivePuzzleSession
+        +--> 正常模式：HexReasoningSolver.next_step()
+        |              -> 目标格 + 动作 + 中文理由
         |
-        v
-HexReasoningSolver.next_step()
-        |
-        v
-方案 2 UI：目标格 + 动作 + 中文理由
+        +--> 模拟推演：SimulationSession(public board only)
+                       -> 模拟标记 + 公开约束冲突集合
 ```
 
 主要文件：
@@ -217,19 +224,21 @@ HexReasoningSolver.next_step()
 - `src/hexsolver_cn/reason_interaction.py`：推理引用解析、富文本悬停/固定状态和键盘交互。
 - `src/hexsolver_cn/solver.py`：确定性局部规则与 CP-SAT 兜底。
 - `src/hexsolver_cn/session.py`：当前局面、剩余数、撤销与重做。
+- `src/hexsolver_cn/simulation.py`：隔离模拟分支、起始状态锁定及独立撤销/重做/重置。
 - `src/hexsolver_cn/session_store.py`：版本化局面存档、完整性校验、原子写入和恢复。
 - `src/hexsolver_cn/unity_random.py`：Unity 5.6.3f1 RNG 位兼容实现。
 - `src/hexsolver_cn/hard_generator.py`：Hard 初始形状、颜色与 Unity 随机序列。
 - `managed_core/`：C# 最小 Unity API 兼容层、Easy 宿主和一键构建脚本。
 - `tools/doctor.py`：离线后端诊断；原版启动差分必须显式启用。
-- `packaging/`：0.8.2 Windows 单文件构建、图标/版本资源和成品冒烟测试入口。
+- `packaging/`：0.9.0 Windows 单文件构建、图标/版本资源和成品冒烟测试入口。
 
 ## 文档
 
-- [开发历史](DEVELOPMENT_HISTORY.md)：从 `0.1.0` 截图原型到当前 `0.8.2` 版本。
+- [开发历史](DEVELOPMENT_HISTORY.md)：从 `0.1.0` 截图原型到当前 `0.9.0` 版本。
 - [工作区说明](docs/WORKSPACE.md)：本地目录、专有文件边界、清理与恢复规则。
 - [求解算法](docs/solver/ALGORITHM.md)：局部规则、CP-SAT 和全局反证。
 - [0.8.2 性能试验](docs/performance/V082_EXPERIMENTS.md)：可复现基准、线程对照、正确性门禁和方案取舍。
+- [0.9.0 模拟推演需求](docs/design/V090_SIMULATION_REQUIREMENTS.md)：公开信息边界、冲突语义和验收标准。
 - [Windows 打包与发布](docs/PACKAGING.md)：单文件内容、构建、验证和专有文件边界。
 - [种子开发清单](docs/generator/IMPLEMENTATION_PLAN.md)：实现模块与验收标准。
 - [完整文档索引](docs/README.md)。

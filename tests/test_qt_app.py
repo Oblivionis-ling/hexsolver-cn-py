@@ -23,7 +23,13 @@ from hexsolver_cn.app import (  # noqa: E402
 from hexsolver_cn.board_view import HexBoardView  # noqa: E402
 from hexsolver_cn.demo_board import build_demo_board  # noqa: E402
 from hexsolver_cn.dialogs import LightConfirmDialog  # noqa: E402
-from hexsolver_cn.models import CellVisualType, MoveAction, SuggestedMove  # noqa: E402
+from hexsolver_cn.models import (  # noqa: E402
+    CellReveal,
+    CellVisualType,
+    ClueType,
+    MoveAction,
+    SuggestedMove,
+)
 from hexsolver_cn.original_bridge import (  # noqa: E402
     OriginalRuntimeHardBackend,
 )
@@ -101,6 +107,24 @@ class QtAppWorkflowTests(unittest.TestCase):
                 Qt.MouseButton.LeftButton,
             )
         self.app.processEvents()
+
+    def _wait_for_simulation_check(self, timeout: float = 6.0) -> None:
+        deadline = time.monotonic() + timeout
+        stable_idle_cycles = 0
+        while time.monotonic() < deadline:
+            self.app.processEvents()
+            if (
+                self.window._simulation_conflict_thread is None
+                and not self.window._simulation_check_pending
+            ):
+                stable_idle_cycles += 1
+                if stable_idle_cycles >= 2:
+                    break
+            else:
+                stable_idle_cycles = 0
+            time.sleep(0.01)
+        self.app.processEvents()
+        self.assertIsNone(self.window._simulation_conflict_thread)
 
     def test_demo_board_can_suggest_and_apply_one_forced_move(self) -> None:
         self.assertEqual("", self.window.apply_button.toolTip())
@@ -815,6 +839,106 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.window.undo()
 
         self.assertIs(self.window.session.board.get_cell(coord).visual_type, CellVisualType.HIDDEN)
+
+    def test_simulation_disables_next_step_and_restores_real_board(self) -> None:
+        coord = self.window.session.board.hidden_cells()[0].coord
+        self.window._save_autosave_now()
+        autosave_before = self.window.session_store.autosave_path.read_bytes()
+
+        self.window.start_simulation()
+        self.assertIsNotNone(self.window.simulation_session)
+        self.assertFalse(self.window.step_action_bar.isHidden())
+        self.assertTrue(self.window.next_button.isHidden())
+        self.assertTrue(self.window.apply_button.isHidden())
+        self.assertFalse(self.window.next_button.isEnabled())
+        self.assertFalse(self.window.apply_button.isEnabled())
+        self.assertIn("正在模拟推演", self.window.stage.mode_chip.text())
+        self.assertEqual("结束模拟推演", self.window.simulation_button.text())
+
+        with patch("hexsolver_cn.app.HexReasoningSolver.next_step") as next_step:
+            self.window.solve_next_step()
+            next_step.assert_not_called()
+            self.assertIsNone(self.window._solve_thread)
+
+        self.window._select_state(CellVisualType.BLACK)
+        self.window._on_cell_activated(coord)
+        self._wait_for_simulation_check()
+        assert self.window.simulation_session is not None
+        self.assertIs(
+            CellVisualType.BLACK,
+            self.window.simulation_session.board.get_cell(coord).visual_type,
+        )
+        self.assertIs(
+            CellVisualType.HIDDEN,
+            self.window.session.board.get_cell(coord).visual_type,
+        )
+        self.window._save_autosave_now()
+        self.assertEqual(
+            autosave_before,
+            self.window.session_store.autosave_path.read_bytes(),
+        )
+
+        self.window.end_simulation()
+        self._wait_for_simulation_check()
+        self.assertIsNone(self.window.simulation_session)
+        self.assertIs(
+            CellVisualType.HIDDEN,
+            self.window.session.board.get_cell(coord).visual_type,
+        )
+        self.assertFalse(self.window.next_button.isHidden())
+        self.assertFalse(self.window.apply_button.isHidden())
+        self.assertTrue(self.window.next_button.isEnabled())
+
+    def test_simulation_marks_never_release_private_clues(self) -> None:
+        coord = self.window.session.board.hidden_cells()[0].coord
+        self.window.session.private_reveals[coord] = CellReveal(
+            visual_type=CellVisualType.BLACK,
+            clue_text="-2-",
+            clue_type=ClueType.NONCONSECUTIVE,
+            clue_number=2,
+        )
+        self.window.start_simulation()
+        self.window._select_state(CellVisualType.BLACK)
+        self.window._on_cell_activated(coord)
+        self._wait_for_simulation_check()
+
+        assert self.window.simulation_session is not None
+        simulated = self.window.simulation_session.board.get_cell(coord)
+        real = self.window.session.board.get_cell(coord)
+        assert simulated is not None and real is not None
+        self.assertEqual("", simulated.clue_text)
+        self.assertIs(ClueType.NONE, simulated.clue_type)
+        self.assertIs(CellVisualType.HIDDEN, real.visual_type)
+        self.assertEqual("", real.clue_text)
+
+        self.window.end_simulation()
+        self._wait_for_simulation_check()
+
+    def test_simulation_conflict_highlights_sufficient_assumption_set(self) -> None:
+        self.window.start_simulation()
+        assert self.window.simulation_session is not None
+        simulation = self.window.simulation_session
+        remaining = simulation.initial_board.remaining_blue
+        assert remaining is not None
+        coords = [cell.coord for cell in simulation.board.hidden_cells()]
+        for coord in coords[: remaining + 1]:
+            simulation.set_cell_state(coord, CellVisualType.BLUE)
+        self.window._simulation_changed()
+        self._wait_for_simulation_check()
+
+        highlighted = self.window.stage.board_view.simulation_conflict_coords
+        self.assertTrue(highlighted)
+        self.assertTrue(set(highlighted).issubset(set(simulation.changed_coords)))
+        self.assertEqual("发现模拟矛盾", self.window.step_title.text())
+        self.assertIn("共同导致公开条件无解", self.window.step_reason.toPlainText())
+        self.assertIn("不代表", self.window.step_reason.toPlainText())
+
+        self.window.reset_board()
+        self._wait_for_simulation_check()
+        self.assertEqual((), simulation.changed_coords)
+        self.assertEqual((), self.window.stage.board_view.simulation_conflict_coords)
+        self.window.end_simulation()
+        self._wait_for_simulation_check()
 
     def test_unverified_seed_does_not_replace_current_board(self) -> None:
         before = self.window.session.board

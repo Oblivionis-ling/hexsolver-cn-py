@@ -17,7 +17,7 @@ $assetScript = Join-Path $projectRoot "packaging\build_assets.py"
 $assetDir = Join-Path $projectRoot "build\package_assets"
 $workDir = Join-Path $projectRoot "build\pyinstaller"
 $distDir = Join-Path $projectRoot "dist"
-$expectedVersion = "0.8.2"
+$expectedVersion = "0.9.0"
 
 function Write-Step([string]$message) {
     Write-Host "[HexInfinite $expectedVersion] $message" -ForegroundColor Cyan

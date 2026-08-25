@@ -121,7 +121,7 @@ class HexCounterBadge(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
     def set_value(self, value: int, caption: str = "剩余") -> None:
-        self._value = max(0, int(value))
+        self._value = int(value)
         self._caption = caption
         self.update()
 
@@ -141,7 +141,7 @@ class HexCounterBadge(QWidget):
         painter.setBrush(QColor(0, 0, 0, 33))
         painter.drawPolygon(QPolygonF([QPointF(p.x(), p.y() + 5) for p in points]))
         painter.setPen(QPen(QColor(COLORS["white"]), 2.5))
-        painter.setBrush(QColor(COLORS["blue"]))
+        painter.setBrush(QColor(COLORS["danger"] if self._value < 0 else COLORS["blue"]))
         painter.drawPolygon(QPolygonF(points))
 
         painter.setPen(QColor(COLORS["white"]))
