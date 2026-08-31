@@ -141,8 +141,11 @@ def _verify_v081_confirmation_and_global_reason(
             or dialog.accept_button.text() != "继续局面"
             or dialog.reject_button.text() != "放弃并查看说明"
             or not dialog.accept_button.isDefault()
+            or dialog.parentWidget() is not window
+            or not window.isVisible()
+            or bool(dialog.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
         ):
-            raise RuntimeError("0.8.1 浅色确认框或中文操作按钮没有进入冻结成品。")
+            raise RuntimeError("恢复确认框没有在可见主窗口上以非永久置顶方式显示。")
     finally:
         dialog.close()
 
@@ -409,6 +412,13 @@ def run_package_smoke_test() -> int:
             raise RuntimeError("打包界面的推理原因区域没有获得预期高度。")
         if window.step_reason.geometry().bottom() >= window.step_action_bar.geometry().top():
             raise RuntimeError("打包界面的推理正文进入了底部按钮区域。")
+        if (
+            window.simulation_button.text() != "模拟"
+            or window.simulation_button.width() != 72
+            or window.simulation_button.accessibleName() != "开始模拟推演"
+            or not 100 <= window.next_button.width() < 170
+        ):
+            raise RuntimeError("下一步操作栏没有使用紧凑且完整可读的按钮布局。")
         _verify_reason_bottom_safe_area(window, app)
         _verify_v081_confirmation_and_global_reason(window, app)
         if any(button.size() != QSize(60, 56) for button in window.state_buttons.values()):

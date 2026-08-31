@@ -2,16 +2,16 @@
 
 ## 目标
 
-`0.9.0` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享版本化种子缓存与局面存档实现。本版新增只使用公开条件的 `SimulationSession`：推演期间不揭示新信息、关闭下一步推理，公开约束矛盾在后台检测，退出时丢弃模拟分支；地图生成、正常求解步骤、解释和真实局面保存逻辑保持不变。
+`0.9.1` 将现有 PySide6 求解器封装为一个 Windows x64 EXE。源码版与成品版都从 `MainWindow`、`HexReasoningSolver` 和同一组 Easy/Hard 后端启动，并共享版本化种子缓存、局面存档和模拟推演实现。本版把 CP-SAT 移出首屏关键路径，并修复恢复确认框早于主窗口显示的问题；地图生成、正常求解步骤、解释、模拟推演和真实局面保存逻辑保持不变。
 
 发布资产：
 
 ```text
-HexInfiniteSolver-0.9.0-windows-x64.exe
-HexInfiniteSolver-0.9.0-windows-x64.exe.sha256
+HexInfiniteSolver-0.9.1-windows-x64.exe
+HexInfiniteSolver-0.9.1-windows-x64.exe.sha256
 ```
 
-最终冻结成品为 96,567,151 字节（92.09 MiB），FileVersion/ProductVersion 均为 `0.9.0`，SHA-256 为 `626f6fe66b5d12210d4e8c7073d9ebe952a460f67c9b96f7de5bb40aba28cfef`。
+最终冻结成品为 96,571,253 字节（92.10 MiB），FileVersion/ProductVersion 均为 `0.9.1`，SHA-256 为 `503286a5a92452b8f2000e7fe216018e0aea0bf779af917280f9f31788cdce0b`。
 
 ## 成品包含什么
 
@@ -22,7 +22,7 @@ HexInfiniteSolver-0.9.0-windows-x64.exe.sha256
 - Qt 插件、字体图标、应用图标和 Windows 版本资源。
 - 种子缓存、局面存档、用户体验偏好、设置页和隔离模拟推演；运行时用户数据不会预置在 EXE 中。
 
-截图入口当前关闭，因此 0.9.0 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI、种子求解或模拟推演流程。
+截图入口当前关闭，因此 0.9.1 成品排除 OpenCV、ONNX Runtime 和 RapidOCR，以减少体积；这不改变当前可用 UI、种子求解或模拟推演流程。
 
 ## 成品不包含什么
 
@@ -47,7 +47,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 2. 重建 Easy 托管宿主。
 3. 运行完整源码测试。
 4. 生成 EXE 图标和 Windows 版本资源。
-5. 生成单文件 `windowed` 应用。
+5. 临时把 DLL 搜索路径收敛到项目 Python 环境和 Windows 系统目录，生成单文件 `windowed` 应用，随后恢复调用者原有 `PATH`。
 6. 检查归档包含三个可再分发托管文件，且不含原版 `Assembly-CSharp.dll`。
 7. 用真实 EXE 执行 `--package-smoke-test`。
 8. 输出 SHA-256 文件。
@@ -61,6 +61,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 - 核对启动盘面为空、四步手绘使用说明与关闭入口存在，并确认盘面操作在说明显示期间禁用；
 - 核对“应用当前建议”按钮没有悬停提示框但保留无障碍名称；
 - 核对步骤历史和重复统计控件已移除、推理原因区域获得预期高度；
+- 核对常态模拟入口完整显示“模拟”、保留完整无障碍名称，并让“计算下一步”在不裁字的前提下使用紧凑宽度；
 - 核对推理正文严格位于固定按钮栏上方，并且手动标记图例采用紧凑尺寸；
 - 依次点击未知、蓝格、排除按钮，核对互斥选中状态以及黑、橘、蓝三种轮廓的实际渲染像素；
 - 在设置页开启原版式鼠标操作，核对左键排除、右键蓝色、重复同键恢复未知，以及开启/关闭时手动工具的禁用与恢复；
@@ -70,6 +71,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 - 核对右下角设置入口可访问，设置页显示真实缓存目录、三种启动窗口模式、使用说明入口和鼠标操作开关；
 - 核对局面自动恢复开关、保存/载入/清除入口、重做按钮，以及存档写入后恢复种子与格子状态；
 - 核对恢复、清除进度和删除缓存的浅色确认框不继承系统深色表面，且使用明确的中文操作按钮；
+- 核对恢复确认框的父窗口已经可见、没有永久置顶标志，并在显示后请求提升与焦点；
 - 核对全局唯一性理由包含结论、试填反证、合法填法计数、关键条件、详细核查与术语说明；
 - 进入模拟推演后核对下一步推理和应用建议完全隐藏、顶部模式提示存在、起始公开状态被锁定，且模拟蓝格不释放私有提示；
 - 构造只在多个模拟填块共同存在时才无解的公开约束，核对红色双层冲突轮廓、负数模拟剩余提示和充分冲突集合语义；随后结束推演并确认真实盘面完整恢复；
@@ -86,6 +88,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\buil
 
 - 成品目标为 Windows 10/11 x64。
 - 单文件程序首次启动需要解压运行时到系统临时目录，可能比后续源码环境启动稍慢。
+- CP-SAT 只在全局推理需要时加载；应用会在首屏绘制 250 ms 后用后台线程预热，因此不会阻塞窗口和恢复确认框出现。
 - 当前没有商业代码签名，SmartScreen 可能提示未知发布者；应核对 Release 中的 SHA-256。
 - Easy 依赖合法安装的特定原版程序集；找不到或哈希不匹配时会明确拒绝生成，不会退化为近似地图。
 - 缓存采用版本化 JSON，键包含 schema、Steam Build、难度、种子、后端 ID 和精确性；损坏或不匹配时直接重算。打包冒烟使用独立临时缓存目录，结束后只删除该已验证的临时目录。

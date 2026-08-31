@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import itertools
+import threading
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
-
-from ortools.sat.python import cp_model
+from types import ModuleType
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from .models import (
     Board,
@@ -17,6 +17,44 @@ from .models import (
     RowClue,
     SuggestedMove,
 )
+
+
+_cp_model_module: ModuleType | None = None
+_cp_model_lock = threading.Lock()
+
+
+def _load_cp_model() -> ModuleType:
+    """Load the heavy CP-SAT Python layer only when global reasoning needs it."""
+
+    global _cp_model_module
+    if _cp_model_module is None:
+        with _cp_model_lock:
+            if _cp_model_module is None:
+                from ortools.sat.python import cp_model as imported_cp_model
+
+                _cp_model_module = imported_cp_model
+                globals()["cp_model"] = imported_cp_model
+    return _cp_model_module
+
+
+class _LazyCpModelModule:
+    def __getattr__(self, name: str) -> Any:
+        return getattr(_load_cp_model(), name)
+
+
+cp_model: Any = _LazyCpModelModule()
+
+
+def warm_up_global_solver() -> None:
+    """Prepare CP-SAT after the first window is visible, without blocking startup."""
+
+    _load_cp_model()
+
+
+def global_solver_is_ready() -> bool:
+    """Expose warm-up state for startup diagnostics and regression tests."""
+
+    return _cp_model_module is not None
 
 
 NEIGHBOR_DIRS: Sequence[Coord] = (

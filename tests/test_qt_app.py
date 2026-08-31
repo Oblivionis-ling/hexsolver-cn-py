@@ -206,17 +206,23 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.window._on_cell_activated((1, 0))
         self.window._save_autosave_now()
 
-        with patch(
-            "hexsolver_cn.app.ask_confirmation",
-            return_value=True,
-        ):
-            restored = MainWindow(
-                seed_generators=SeedGeneratorRegistry(),
-                preferences=self.preferences,
-                session_store=SessionStore(self.preferences_directory.name),
-                restore_on_startup=True,
-            )
+        restored = None
         try:
+            with patch(
+                "hexsolver_cn.app.ask_confirmation",
+                return_value=True,
+            ) as confirmation:
+                restored = MainWindow(
+                    seed_generators=SeedGeneratorRegistry(),
+                    preferences=self.preferences,
+                    session_store=SessionStore(self.preferences_directory.name),
+                    restore_on_startup=True,
+                )
+                confirmation.assert_not_called()
+                restored.show()
+                self.app.processEvents()
+                confirmation.assert_called_once()
+                self.assertTrue(confirmation.call_args.args[0].isVisible())
             self.assertEqual(SeedRequest(17, Difficulty.HARD), restored.current_seed)
             self.assertIs(
                 CellVisualType.BLACK,
@@ -225,26 +231,34 @@ class QtAppWorkflowTests(unittest.TestCase):
             self.assertFalse(restored._guide_visible)
             self.assertIn("自动恢复", restored.stage.mode_chip.text())
         finally:
-            restored.close()
+            if restored is not None:
+                restored.close()
 
     def test_autosave_decline_discards_progress_and_keeps_guide(self) -> None:
         self.window._save_autosave_now()
-        with patch(
-            "hexsolver_cn.app.ask_confirmation",
-            return_value=False,
-        ):
-            fresh = MainWindow(
-                seed_generators=SeedGeneratorRegistry(),
-                preferences=self.preferences,
-                session_store=SessionStore(self.preferences_directory.name),
-                restore_on_startup=True,
-            )
+        fresh = None
         try:
+            with patch(
+                "hexsolver_cn.app.ask_confirmation",
+                return_value=False,
+            ) as confirmation:
+                fresh = MainWindow(
+                    seed_generators=SeedGeneratorRegistry(),
+                    preferences=self.preferences,
+                    session_store=SessionStore(self.preferences_directory.name),
+                    restore_on_startup=True,
+                )
+                confirmation.assert_not_called()
+                fresh.show()
+                self.app.processEvents()
+                confirmation.assert_called_once()
+                self.assertTrue(confirmation.call_args.args[0].isVisible())
             self.assertFalse(fresh._has_active_board)
             self.assertTrue(fresh._guide_visible)
             self.assertFalse(fresh.session_store.has_autosave())
         finally:
-            fresh.close()
+            if fresh is not None:
+                fresh.close()
 
     def test_fresh_window_uses_guide_instead_of_demo_board(self) -> None:
         fresh = MainWindow(
@@ -330,6 +344,24 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.window.resize(1120, 760)
         self.app.processEvents()
         self.assertGreaterEqual(self.window.step_reason.height(), 300)
+
+    def test_step_actions_use_compact_simulation_and_next_buttons(self) -> None:
+        self.window.show()
+        self.app.processEvents()
+
+        simulation_content_width = (
+            self.window.simulation_button.fontMetrics().horizontalAdvance("模拟")
+            + self.window.simulation_button.iconSize().width()
+            + 20
+        )
+        self.assertEqual("模拟", self.window.simulation_button.text())
+        self.assertEqual(72, self.window.simulation_button.width())
+        self.assertEqual("开始模拟推演", self.window.simulation_button.accessibleName())
+        self.assertEqual("开始模拟推演", self.window.simulation_button.toolTip())
+        self.assertLessEqual(simulation_content_width, self.window.simulation_button.width())
+        self.assertGreaterEqual(self.window.simulation_button.height(), 38)
+        self.assertGreaterEqual(self.window.next_button.width(), 100)
+        self.assertLess(self.window.next_button.width(), 170)
 
     def test_manual_state_buttons_render_distinct_active_outlines(self) -> None:
         self.window.show()
@@ -632,8 +664,15 @@ class QtAppWorkflowTests(unittest.TestCase):
             reject_text="放弃并查看说明",
         )
         try:
-            dialog.show()
-            self.app.processEvents()
+            with (
+                patch.object(dialog, "raise_") as raise_dialog,
+                patch.object(dialog, "activateWindow") as activate_dialog,
+            ):
+                self.window.show()
+                dialog.show()
+                self.app.processEvents()
+                raise_dialog.assert_called_once()
+                activate_dialog.assert_called_once()
             self.assertIn("background-color: #FFFFFF", dialog.styleSheet())
             self.assertEqual("发现未完成的局面", dialog.title_label.text())
             self.assertEqual("继续局面", dialog.accept_button.text())
@@ -641,6 +680,10 @@ class QtAppWorkflowTests(unittest.TestCase):
             self.assertTrue(dialog.accept_button.isDefault())
             self.assertGreaterEqual(dialog.accept_button.height(), 42)
             self.assertEqual("关闭", dialog.close_button.accessibleName())
+            self.assertTrue(self.window.isVisible())
+            self.assertFalse(
+                bool(dialog.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+            )
         finally:
             dialog.close()
 
@@ -888,6 +931,8 @@ class QtAppWorkflowTests(unittest.TestCase):
         self.assertFalse(self.window.next_button.isHidden())
         self.assertFalse(self.window.apply_button.isHidden())
         self.assertTrue(self.window.next_button.isEnabled())
+        self.assertEqual("模拟", self.window.simulation_button.text())
+        self.assertEqual(72, self.window.simulation_button.width())
 
     def test_simulation_marks_never_release_private_clues(self) -> None:
         coord = self.window.session.board.hidden_cells()[0].coord

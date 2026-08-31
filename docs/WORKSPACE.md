@@ -31,7 +31,7 @@ F:\SteamLibrary\steamapps\common\Hexcells Infinite
 
 - `.conda_env/`：当前一键启动环境，可由 `run.ps1` 重建；
 - `managed_core/bin/`：Easy 托管核心构建产物，可由 `managed_core/build.ps1` 重建；
-- `dist/`：当前最新成品为 0.9.0 单文件 EXE 与 SHA-256；旧版仅作为本地历史产物暂存，不进入源码提交；
+- `dist/`：当前最新成品为 0.9.1 单文件 EXE 与 SHA-256；旧版仅作为本地历史产物暂存，不进入源码提交；
 - `build/`：PyInstaller 中间目录，发布验证后删除，需要时可由 `packaging/build_app.ps1` 重建；
 - `tests/images/`、`tests/labels/`：含原版游戏截图的 OCR 本地数据；
 - `tests/reports/`：临时视觉 QA 输出；
@@ -148,6 +148,13 @@ Easy 托管核心的真实集成校验仍需要合法安装中的 `Assembly-CSha
 - 推演期间关闭下一步推理和应用建议，使用独立撤销、重做、重置和单一退出入口；设置、生成及局面存取在推演期间被阻止。
 - `docs/design/` 增加原生 Windows Qt 模拟冲突画面；100 项源码回归与冻结成品 UI + Easy/Hard seed 1 冒烟均通过。
 - 源码、版本资源和成品文件名统一为 `0.9.0`。当前本地成品为 96,567,151 字节（92.09 MiB），SHA-256 为 `626f6fe66b5d12210d4e8c7073d9ebe952a460f67c9b96f7de5bb40aba28cfef`。
+
+## 2026-08-31 0.9.1 更新
+
+- CP-SAT 改为线程安全的按需导入，并在主窗口首次绘制后后台预热；局部推理和首屏不再等待 OR-Tools/Pandas 初始化。
+- 自动恢复询问延迟到主窗口可见后执行；浅色确认框提升并请求焦点，但不使用永久置顶。
+- PyInstaller 构建阶段隔离 DLL 搜索路径，防止外部 Poppler/ICU 等开发运行库污染成品；不安全的 Qt 裁剪未进入最终实现。
+- 源码、版本资源和成品文件名统一为 `0.9.1`。当前本地成品为 96,571,253 字节（92.10 MiB），SHA-256 为 `503286a5a92452b8f2000e7fe216018e0aea0bf779af917280f9f31788cdce0b`。
 
 ## 清理原则
 

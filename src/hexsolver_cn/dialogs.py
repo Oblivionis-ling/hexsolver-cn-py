@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import qtawesome as qta
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QColor
+from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtGui import QColor, QShowEvent
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
@@ -195,6 +195,16 @@ class LightConfirmDialog(QDialog):
             QPushButton#ConfirmDangerButton:hover {{ background-color: #C94E44; }}
             """
         )
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        QTimer.singleShot(0, self._activate_over_visible_parent)
+
+    def _activate_over_visible_parent(self) -> None:
+        if not self.isVisible():
+            return
+        self.raise_()
+        self.activateWindow()
 
 
 def ask_confirmation(

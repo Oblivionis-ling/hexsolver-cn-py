@@ -17,7 +17,7 @@ $assetScript = Join-Path $projectRoot "packaging\build_assets.py"
 $assetDir = Join-Path $projectRoot "build\package_assets"
 $workDir = Join-Path $projectRoot "build\pyinstaller"
 $distDir = Join-Path $projectRoot "dist"
-$expectedVersion = "0.9.0"
+$expectedVersion = "0.9.1"
 
 function Write-Step([string]$message) {
     Write-Host "[HexInfinite $expectedVersion] $message" -ForegroundColor Cyan
@@ -81,9 +81,28 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Step "Building the single-file Windows x64 executable..."
-& $pythonExe -m PyInstaller --noconfirm --clean --distpath $distDir --workpath $workDir $specPath
-if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $artifactPath -PathType Leaf)) {
-    throw "PyInstaller did not produce $artifactPath."
+$previousProcessPath = $env:PATH
+$pythonRoot = Split-Path -Parent $pythonExe
+$isolatedBuildPath = @(
+    $pythonRoot,
+    (Join-Path $pythonRoot "Scripts"),
+    (Join-Path $pythonRoot "Library\bin"),
+    [Environment]::SystemDirectory,
+    $env:SystemRoot,
+    (Join-Path $env:SystemRoot "System32\Wbem"),
+    (Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0")
+) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } | Select-Object -Unique
+try {
+    # PyInstaller resolves transitive DLLs through PATH. Keep unrelated desktop
+    # tool runtimes (for example a bundled Poppler/ICU) out of the frozen app.
+    $env:PATH = $isolatedBuildPath -join [IO.Path]::PathSeparator
+    & $pythonExe -m PyInstaller --noconfirm --clean --distpath $distDir --workpath $workDir $specPath
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $artifactPath -PathType Leaf)) {
+        throw "PyInstaller did not produce $artifactPath."
+    }
+}
+finally {
+    $env:PATH = $previousProcessPath
 }
 
 $archiveViewer = Join-Path (Split-Path -Parent $pythonExe) "Scripts\pyi-archive_viewer.exe"

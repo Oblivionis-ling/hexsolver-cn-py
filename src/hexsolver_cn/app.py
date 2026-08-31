@@ -8,7 +8,14 @@ from typing import TYPE_CHECKING, Optional
 
 import qtawesome as qta
 from PySide6.QtCore import QRegularExpression, QSize, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QAction, QColor, QFont, QKeySequence, QRegularExpressionValidator
+from PySide6.QtGui import (
+    QAction,
+    QColor,
+    QFont,
+    QKeySequence,
+    QRegularExpressionValidator,
+    QShowEvent,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -36,7 +43,12 @@ from .settings_dialog import SettingsDialog
 from .session import BoardStateError, InteractivePuzzleSession
 from .session_store import SESSION_FILE_SUFFIX, SessionStore, SessionStoreError, StoredSession
 from .simulation import SimulationSession
-from .solver import HexReasoningSolver, PublicConstraintConflict, SolverCancelled
+from .solver import (
+    HexReasoningSolver,
+    PublicConstraintConflict,
+    SolverCancelled,
+    warm_up_global_solver,
+)
 from .theme import COLORS, app_stylesheet
 from .widgets import ChamferPanel, HexCounterBadge, StateButton
 
@@ -148,6 +160,18 @@ class SimulationConflictThread(QThread):
             self.failed.emit(str(exc), self.revision)
             return
         self.succeeded.emit(report, self.revision)
+
+
+class SolverWarmupThread(QThread):
+    """Import CP-SAT after first paint so startup never waits for the solver runtime."""
+
+    def run(self) -> None:
+        try:
+            warm_up_global_solver()
+        except Exception:
+            # A real global solve will surface the original import error with context.
+            # Warm-up itself is opportunistic and must never prevent the UI from opening.
+            return
 
 
 class BoardStage(QWidget):
@@ -319,6 +343,8 @@ class MainWindow(QMainWindow):
         self._autosave_timer = QTimer(self)
         self._autosave_timer.setSingleShot(True)
         self._autosave_timer.timeout.connect(self._save_autosave_now)
+        self._restore_on_startup_requested = bool(restore_on_startup)
+        self._startup_restore_scheduled = False
 
         self.root = QWidget()
         self.root.setObjectName("AppRoot")
@@ -409,8 +435,15 @@ class MainWindow(QMainWindow):
             close_guide=False,
         )
         self.show_onboarding()
-        if restore_on_startup:
-            self._restore_autosave_on_startup()
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        if (
+            self._restore_on_startup_requested
+            and not self._startup_restore_scheduled
+        ):
+            self._startup_restore_scheduled = True
+            QTimer.singleShot(0, self._restore_autosave_on_startup)
 
     def _build_sidebar(self) -> QWidget:
         sidebar = QWidget()
@@ -599,7 +632,7 @@ class MainWindow(QMainWindow):
         self.apply_button.setEnabled(False)
         actions.addWidget(self.apply_button)
 
-        self.simulation_button = QPushButton()
+        self.simulation_button = QPushButton("模拟")
         self.simulation_button.setObjectName("SimulationButton")
         self.simulation_button.setIcon(
             qta.icon("fa5s.flask", color=COLORS["orange_hover"])
@@ -610,11 +643,11 @@ class MainWindow(QMainWindow):
             "固定当前真实盘面，在不揭示新信息的隔离分支中尝试填块"
         )
         self.simulation_button.setToolTip("开始模拟推演")
-        self.simulation_button.setFixedSize(42, 38)
+        self.simulation_button.setFixedSize(72, 38)
         self.simulation_button.setStyleSheet(
             f"QPushButton {{ color: {COLORS['orange_hover']}; "
             f"background: {COLORS['orange_soft']}; border: 1px solid {COLORS['orange']}; "
-            "font-weight: 700; }} "
+            "font-weight: 700; padding: 0 8px; }} "
             f"QPushButton:hover {{ background: {COLORS['white']}; }} "
             "QPushButton:disabled { color: #B9A98D; background: #F3EEE5; border-color: #DDD2C0; }"
         )
@@ -884,7 +917,7 @@ class MainWindow(QMainWindow):
                 )
             )
             return
-        self.simulation_button.setText("开始模拟推演")
+        self.simulation_button.setText("模拟")
         self.simulation_button.setIcon(
             qta.icon("fa5s.flask", color=COLORS["orange_hover"])
         )
@@ -897,11 +930,11 @@ class MainWindow(QMainWindow):
             QSizePolicy.Policy.Fixed,
             QSizePolicy.Policy.Fixed,
         )
-        self.simulation_button.setFixedSize(42, 38)
+        self.simulation_button.setFixedSize(72, 38)
         self.simulation_button.setStyleSheet(
             f"QPushButton {{ color: {COLORS['orange_hover']}; "
             f"background: {COLORS['orange_soft']}; border: 1px solid {COLORS['orange']}; "
-            "font-weight: 700; }} "
+            "font-weight: 700; padding: 0 8px; }} "
             f"QPushButton:hover {{ background: {COLORS['white']}; }} "
             "QPushButton:disabled { color: #B9A98D; background: #F3EEE5; border-color: #DDD2C0; }"
         )
@@ -1607,4 +1640,7 @@ def run_app() -> None:
     preferences = AppPreferences()
     window = MainWindow(preferences=preferences, restore_on_startup=True)
     show_window_for_startup(window, preferences.startup_window_mode)
+    solver_warmup = SolverWarmupThread()
+    QTimer.singleShot(250, solver_warmup.start)
+    app.aboutToQuit.connect(solver_warmup.wait)
     app.exec()

@@ -168,6 +168,21 @@ The current Hard runtime capture now shows the same intended content class as th
 - 顶部橙色文字持续说明“所有填块都不会揭示新信息”，手动区标题改为“模拟标记”，因此模式与冲突都不只依赖颜色表达。
 - 原生 Windows Qt 截图人工检查了侧栏高度、模式层级、多个冲突格、计数器和退出入口；100 项源码回归与冻结成品冒烟另行核对状态隔离、不释放提示、下一步关闭和真实盘面恢复。
 
+### Pass 17 (`0.9.1`)
+
+- 启动恢复询问不再发生在主窗口构造期；事件循环先显示并绘制主窗口，再打开具有可见父窗口的模态确认框。
+- 确认框显示后调用提升和窗口激活，并明确不设置永久置顶标志；关闭后不会影响其他窗口层级。
+- 原生 Windows 句柄检查确认 `GetForegroundWindow()` 返回确认框句柄，父窗口同时可见且确认框为活动窗口。
+- CP-SAT 在首屏期间保持未导入，局部推理也不会触发；250 ms 后后台预热，全局推理接口与结论不变。
+- 101 项源码回归和冻结成品 UI + Easy/Hard seed 1 冒烟通过；本版没有视觉样式变化，因此不新增重复截图。
+
+### Pass 18 (`0.9.1`)
+
+- 常态模拟入口从 42 px 图标位承载长文本改为 72 px“模拟”按钮，不再出现“开始模拟推演”被裁成局部字符的问题。
+- 烧瓶图标、橙色次要操作层级、完整悬停说明和无障碍名称保持不变；进入模拟后仍扩展为唯一的“结束模拟推演”主操作。
+- 增加的 30 px 由可伸缩“计算下一步”按钮让出，三个操作仍保持 6 px 间距、38 px 视觉高度和完整可读文字。
+- 102 项源码回归和冻结成品冒烟检查常态文字、实际宽度、完整无障碍名称，以及进入/退出模拟后的标签恢复。
+
 ## Implementation checklist
 
 - [x] Selected direction 2 reproduced as a functional two-column desktop UI.
@@ -178,7 +193,7 @@ The current Hard runtime capture now shows the same intended content class as th
 - [x] Easy seed 1 dense-board capture passed visual inspection.
 - [x] Hard seed 3 step 55 long global proof passed top/bottom scroll inspection at both supported window sizes.
 - [x] 0.7.3 onboarding and 0.7.4 white startup dropdown passed native Windows Qt visual inspection at their recorded logical sizes and device pixel ratios.
-- [x] One hundred automated core, cache, bridge, solver, simulation, session-store and Qt workflow tests pass.
+- [x] One hundred and two automated core, cache, bridge, solver, startup, simulation, session-store and Qt workflow tests pass.
 - [x] Full-screen long-reason bottom capture and end-cursor visibility check pass.
 - [x] Hidden, blue and excluded buttons render black, orange and blue active outlines respectively.
 - [x] Original-style mouse controls persist, map real left/right clicks, toggle back to unknown, and restore manual tools when disabled.
